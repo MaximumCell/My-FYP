@@ -11,15 +11,19 @@ function App() {
     <>
       <main>
         <Header />
-    
+          <section id="home">
           <Hero />
-        
+          </section>
+          <section id="ml-box">
           <MLSection />
-
+          </section>
+          <section id="simulation">
           <Simulation />
+          </section>
 
+          <section id="tutor">
           <MathAI />
-
+          </section>
           <Footer />
 
 

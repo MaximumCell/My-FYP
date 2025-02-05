@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import logo from "./assets/logo.jpg"
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -7,14 +8,25 @@ const Header = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
+  const scrollToSection = (id) => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
   return (
     <header className="sticky top-0 z-50 w-full bg-black text-white shadow-lg">
       <div className="container mx-auto px-6 py-4">
         <div className="flex justify-between items-center">
           {/* Logo */}
           <h1 className="font-montserrat text-2xl font-bold">
-            <a href="#" className="hover:text-blue-200 transition-colors duration-300">
-              Phy Box
+            <a href="#" className="hover:opacity-80 transition-opacity duration-300 flex items-center">
+              <img src={logo} alt="Phy Box Logo" className="h-12 w-auto" />
+              <span className="ml-4">
+                <span className="text-blue-400">Phy</span>
+                <span className="text-white">Box</span>
+              </span>
             </a>
           </h1>
 
@@ -23,7 +35,11 @@ const Header = () => {
             <ul className="flex space-x-8">
               <li>
                 <a
-                  href="#"
+                  href="#home"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("home");
+                  }}
                   className="text-lg font-medium hover:text-blue-200 transition-colors duration-300"
                 >
                   Home
@@ -31,7 +47,11 @@ const Header = () => {
               </li>
               <li>
                 <a
-                  href="#"
+                  href="#simulation"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("simulation");
+                  }}
                   className="text-lg font-medium hover:text-blue-200 transition-colors duration-300"
                 >
                   Simulation
@@ -39,7 +59,11 @@ const Header = () => {
               </li>
               <li>
                 <a
-                  href="#"
+                  href="#tutor"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("tutor");
+                  }}
                   className="text-lg font-medium hover:text-blue-200 transition-colors duration-300"
                 >
                   Tutor
@@ -47,7 +71,11 @@ const Header = () => {
               </li>
               <li>
                 <a
-                  href="#"
+                  href="#ml-box"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("ml-box");
+                  }}
                   className="text-lg font-medium hover:text-blue-200 transition-colors duration-300"
                 >
                   ML Box
@@ -73,7 +101,12 @@ const Header = () => {
             <ul className="flex flex-col space-y-4">
               <li>
                 <a
-                  href="#"
+                  href="#home"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("home");
+                    toggleMobileMenu();
+                  }}
                   className="block text-lg font-medium hover:text-blue-200 transition-colors duration-300"
                 >
                   Home
@@ -81,7 +114,12 @@ const Header = () => {
               </li>
               <li>
                 <a
-                  href="#"
+                  href="#simulation"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("simulation");
+                    toggleMobileMenu();
+                  }}
                   className="block text-lg font-medium hover:text-blue-200 transition-colors duration-300"
                 >
                   Simulation
@@ -89,7 +127,12 @@ const Header = () => {
               </li>
               <li>
                 <a
-                  href="#"
+                  href="#tutor"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("tutor");
+                    toggleMobileMenu();
+                  }}
                   className="block text-lg font-medium hover:text-blue-200 transition-colors duration-300"
                 >
                   Tutor
@@ -97,7 +140,12 @@ const Header = () => {
               </li>
               <li>
                 <a
-                  href="#"
+                  href="#ml-box"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToSection("ml-box");
+                    toggleMobileMenu();
+                  }}
                   className="block text-lg font-medium hover:text-blue-200 transition-colors duration-300"
                 >
                   ML Box
