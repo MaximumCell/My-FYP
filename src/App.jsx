@@ -23,7 +23,7 @@ function App() {
         <section id="tutor" className="scroll-mt-25">
           <MathAI />
         </section>
-        <section id="About" className="scroll-mt-25">
+        <section id="About" className="scroll-mt-10">
           <About />
         </section>
         <Footer />
