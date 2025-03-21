@@ -1,6 +1,9 @@
 import React from "react";
+import TrainModel from "./Pages/TrainModel.jsx";
+import { useNavigate } from "react-router-dom";
 
 const MLSection = () => {
+  const navigate = useNavigate();
   return (
     <section className="bg-gradient-to-r from-blue-900 to-indigo-900 py-20 px-6 text-white">
       <div className="container mx-auto flex flex-col lg:flex-row items-center justify-between gap-10">
@@ -25,12 +28,9 @@ const MLSection = () => {
             tools make it easy to build and deploy ML models.
           </p>
           <button
-            onClick={() => {
-              // Redirect to ML Box
-              window.location.href = "/ml-box";
-            }}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
-          >
+      onClick={() => navigate("/train-ml")}
+      className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105 hover:cursor-pointer"
+    >
             Go to ML Box
           </button>
         </div>
