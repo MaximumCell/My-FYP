@@ -17,6 +17,7 @@ const TrainModel = () => {
   const [samplePrediction, setSamplePrediction] = useState(null);
   const [isTraining, setIsTraining] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
 
   useEffect(() => {
     axios
@@ -26,8 +27,8 @@ const TrainModel = () => {
   }, []);
 
   const handleTrain = async () => {
-    if (!file || !selectedModel || !targetColumn) {
-      setError("Please select a model, target column, and upload a dataset.");
+    if (!file || !selectedModel) {
+      setError("Please select a model and upload a dataset.");
       return;
     }
     setError("");
@@ -36,21 +37,19 @@ const TrainModel = () => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("model", selectedModel);
-    formData.append("target_column", targetColumn);
+
+    if (targetColumn.trim() !== "") {
+      formData.append("target_column", targetColumn);
+    }
+
     formData.append("test_size", testSize);
-    if (selectedModel === "random_forest")
-      formData.append("n_estimators", nEstimators);
-    if (selectedModel === "linear_regression")
-      formData.append("max_iter", maxIter);
+    if (selectedModel === "random_forest") formData.append("n_estimators", nEstimators);
+    if (selectedModel === "linear_regression") formData.append("max_iter", maxIter);
 
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:5000/train",
-        formData,
-        {
-          headers: { "Content-Type": "multipart/form-data" },
-        }
-      );
+      const response = await axios.post("http://127.0.0.1:5000/train", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
 
       setDownloadUrl(response.data.download_url);
       setMSE(response.data.mean_squared_error);
@@ -69,188 +68,180 @@ const TrainModel = () => {
     }
     setError("");
     setIsTesting(true);
-  
-    const inputData = testData.split(",").map((num) => {
-      const parsed = parseFloat(num.trim());
-      return isNaN(parsed) ? null : parsed;
-    }).filter(num => num !== null);
-  
+
+    const inputData = testData
+      .split(",")
+      .map((num) => {
+        const parsed = parseFloat(num.trim());
+        return isNaN(parsed) ? null : parsed;
+      })
+      .filter((num) => num !== null);
+
     if (inputData.length === 0) {
       setError("Invalid test data. Please enter only numbers separated by commas.");
       setIsTesting(false);
       return;
     }
-  
+
     try {
-      console.log("🚀 Sending request to backend...");
       const response = await axios.post("http://127.0.0.1:5000/test", {
         model: selectedModel,
-        new_data: inputData
+        new_data: inputData,
       });
-  
-      console.log("✅ Response received:", response.data);
-      
-      // ✅ Check if predictions exist before setting state
+
       if (response.data.predictions && response.data.predictions.length > 0) {
-        console.log("🎯 Predictions:", response.data.predictions);
         setPredictions(response.data.predictions);
-      } else {
-        console.warn("⚠️ No predictions received");
       }
-  
     } catch (error) {
-      console.error("❌ Error testing model:", error.response?.data || error);
       setError(error.response?.data?.error || "Unknown error occurred.");
+      console.error("Error testing model:", error);
     }
     setIsTesting(false);
   };
-  
+
   return (
-    <div className="p-6">
-      <h2 className="text-xl font-bold">Train & Preview Your Model</h2>
+    <div className={`min-h-screen ${darkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-900"}`}>
+      <div className="max-w-4xl mx-auto p-6">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Train & Test Your Model</h1>
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className={`px-4 py-2 rounded-lg ${
+              darkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"
+            } transition-colors duration-300`}
+          >
+            {darkMode ? "☀️ Light Mode" : "🌙 Dark Mode"}
+          </button>
+        </div>
 
-      {error && <p className="text-red-500">{error}</p>}
+        {/* Error Message */}
+        {error && <p className="text-red-500 mb-6">{error}</p>}
 
-      <div className="mt-4">
-        <label className="block text-gray-700">Select Model:</label>
-        <select
-          className="border p-2 w-full"
-          onChange={(e) => setSelectedModel(e.target.value)}
+        {/* Model Selection */}
+        <div className="mb-6">
+          <label className="block text-lg font-medium mb-2">Select Model:</label>
+          <select
+            className={`w-full p-3 rounded-lg border ${
+              darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300"
+            } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            onChange={(e) => setSelectedModel(e.target.value)}
+          >
+            <option value="">Select Model</option>
+            {models.map((model, index) => (
+              <option key={index} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Target Column */}
+        <div className="mb-6">
+          <label className="block text-lg font-medium mb-2">Target Column (Optional):</label>
+          <input
+            type="text"
+            placeholder="Leave blank to auto-select last column"
+            className={`w-full p-3 rounded-lg border ${
+              darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300"
+            } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            onChange={(e) => setTargetColumn(e.target.value)}
+          />
+        </div>
+
+        {/* File Upload */}
+        <div className="mb-6">
+          <label className="block text-lg font-medium mb-2">Upload Dataset (CSV):</label>
+          <input
+            type="file"
+            className={`w-full p-3 rounded-lg border ${
+              darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300"
+            } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+            accept=".csv"
+            onChange={(e) => setFile(e.target.files[0])}
+          />
+        </div>
+
+        {/* Train Button */}
+        <button
+          onClick={handleTrain}
+          disabled={isTraining}
+          className={`w-full py-3 rounded-lg font-semibold ${
+            isTraining
+              ? "bg-gray-500 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600"
+          } text-white transition-colors duration-300`}
         >
-          <option value="">Select Model</option>
-          {models.map((model, index) => (
-            <option key={index} value={model}>
-              {model}
-            </option>
-          ))}
-        </select>
-      </div>
+          {isTraining ? "Training..." : "Train Model"}
+        </button>
 
-      <div className="mt-4">
-        <label className="block text-gray-700">Target Column:</label>
+        {/* Training Results */}
+        {mse !== null && (
+          <div className="mt-6">
+            <p className="text-lg">
+              <strong>MSE:</strong> {mse.toFixed(4)}
+            </p>
+          </div>
+        )}
+
+        {samplePrediction && (
+          <div className="mt-6">
+            <p className="text-lg">
+              <strong>Sample Prediction:</strong> Input: {samplePrediction.input.join(", ")} → Output:{" "}
+              {samplePrediction.output}
+            </p>
+          </div>
+        )}
+
+        {downloadUrl && (
+          <div className="mt-6">
+            <a
+              href={`http://127.0.0.1:5000${downloadUrl}`}
+              className="text-green-500 hover:underline"
+            >
+              Download Trained Model
+            </a>
+          </div>
+        )}
+
+        {/* Test Section */}
+        <h2 className="text-2xl font-bold mt-8 mb-6">Test Your Model</h2>
         <input
           type="text"
-          placeholder="Enter target column"
-          className="border p-2 w-full"
-          onChange={(e) => setTargetColumn(e.target.value)}
+          placeholder="Enter comma-separated test data"
+          className={`w-full p-3 rounded-lg border ${
+            darkMode ? "bg-gray-800 border-gray-700" : "bg-white border-gray-300"
+          } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+          onChange={(e) => setTestData(e.target.value)}
         />
+
+        {/* Test Button */}
+        <button
+          onClick={handleTest}
+          disabled={isTesting}
+          className={`w-full py-3 mt-4 rounded-lg font-semibold ${
+            isTesting
+              ? "bg-gray-500 cursor-not-allowed"
+              : "bg-green-500 hover:bg-green-600"
+          } text-white transition-colors duration-300`}
+        >
+          {isTesting ? "Testing..." : "Test Model"}
+        </button>
+
+        {/* Test Results */}
+        {predictions.length > 0 && (
+          <div className="mt-6">
+            <h3 className="text-lg font-bold mb-2">Prediction Results:</h3>
+            <div className="space-y-2">
+              {predictions.map((pred, index) => (
+                <p key={index} className="text-lg">
+                  Prediction {index + 1}: {pred}
+                </p>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-
-      <div className="mt-4">
-        <label className="block text-gray-700">Upload Dataset (CSV):</label>
-        <input
-          type="file"
-          className="border p-2 w-full"
-          accept=".csv"
-          onChange={(e) => setFile(e.target.files[0])}
-        />
-      </div>
-
-      <div className="mt-4">
-        <label className="block text-gray-700">Test Size (0.1 - 0.9):</label>
-        <input
-          type="number"
-          step="0.1"
-          min="0.1"
-          max="0.9"
-          value={testSize}
-          className="border p-2 w-full"
-          onChange={(e) => setTestSize(e.target.value)}
-        />
-      </div>
-
-      {selectedModel === "random_forest" && (
-        <div className="mt-4">
-          <label className="block text-gray-700">
-            n_estimators (RandomForest):
-          </label>
-          <input
-            type="number"
-            value={nEstimators}
-            className="border p-2 w-full"
-            onChange={(e) => setNEstimators(e.target.value)}
-          />
-        </div>
-      )}
-
-      {selectedModel === "linear_regression" && (
-        <div className="mt-4">
-          <label className="block text-gray-700">
-            max_iter (Linear Regression):
-          </label>
-          <input
-            type="number"
-            value={maxIter}
-            className="border p-2 w-full"
-            onChange={(e) => setMaxIter(e.target.value)}
-          />
-        </div>
-      )}
-
-      <button
-        onClick={handleTrain}
-        disabled={isTraining}
-        className={`mt-4 bg-blue-500 ${
-          isTraining ? "opacity-50" : "hover:bg-blue-600"
-        } text-white font-semibold py-2 px-6 rounded-lg transition-all duration-300`}
-      >
-        {isTraining ? "Training..." : "Train Model"}
-      </button>
-
-      {mse !== null && (
-        <p className="mt-4 text-lg text-gray-700">
-          <strong>MSE:</strong> {mse.toFixed(4)}
-        </p>
-      )}
-
-      {samplePrediction !== null && (
-        <p className="mt-4 text-lg text-gray-700">
-          <strong>Sample Prediction:</strong> Input:{" "}
-          {samplePrediction.input.join(", ")} → Output:{" "}
-          {samplePrediction.output}
-        </p>
-      )}
-
-      {downloadUrl && (
-        <div className="mt-4">
-          <a
-            href={`http://127.0.0.1:5000${downloadUrl}`}
-            className="text-green-600 font-semibold"
-          >
-            Download Trained Model
-          </a>
-        </div>
-      )}
-
-      <h2 className="text-xl font-bold mt-6">Test Your Model</h2>
-      <input
-        type="text"
-        placeholder="Enter comma-separated test data"
-        className="border p-2 mt-2 w-full"
-        onChange={(e) => setTestData(e.target.value)}
-      />
-      <button
-        onClick={handleTest}
-        disabled={isTesting}
-        className={`mt-2 bg-green-500 ${
-          isTesting ? "opacity-50" : "hover:bg-green-600"
-        } text-white font-semibold py-2 px-6 rounded-lg transition-all duration-300`}
-      >
-        {isTesting ? "Testing..." : "Test Model"}
-      </button>
-
-      {predictions.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-lg font-bold">Prediction Results:</h3>
-          <p className="text-gray-700">
-            {predictions.map((pred, index) => (
-              <span key={index} className="block">{`Prediction ${
-                index + 1
-              }: ${pred}`}</span>
-            ))}
-          </p>
-        </div>
-      )}
     </div>
   );
 };
