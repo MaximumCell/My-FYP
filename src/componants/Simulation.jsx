@@ -1,7 +1,9 @@
 import React from "react";
 import physimimg from "../assets/physimimg.jpg";
+import { useNavigate } from "react-router-dom";
 
 const Simulation = () => {
+  const navigate = useNavigate();
   return (
     <section className="bg-gradient-to-r from-purple-900 to-indigo-900 py-20 px-6 text-white">
       <div className="container mx-auto flex flex-col lg:flex-row items-center justify-between gap-10">
@@ -17,10 +19,7 @@ const Simulation = () => {
             Perfect for students, educators, and enthusiasts alike.
           </p>
           <button
-            onClick={() => {
-              // Redirect to Simulation Box
-              window.location.href = "/simulation-box";
-            }}
+            onClick={() => navigate("/simulation")}
             className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transition-all duration-300 transform hover:scale-105"
           >
             Go to Simulation Box
