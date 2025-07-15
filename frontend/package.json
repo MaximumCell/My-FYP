@@ -1,7 +1,9 @@
 {
   "name": "my-fyp-project",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "Physics Simulation & ML Project - Frontend React Application",
+  "author": "MaximumCell",
   "type": "module",
   "scripts": {
     "dev": "vite",
