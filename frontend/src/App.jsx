@@ -1,3 +1,16 @@
+/**
+ * Main App Component
+ * 
+ * This component sets up the main routing structure for the Physics Simulation & ML Project.
+ * It includes routes for:
+ * - Home page with project overview
+ * - ML model training interface
+ * - Physics simulation visualization
+ * - ML model testing and classification
+ * 
+ * @returns {JSX.Element} The main application component
+ */
+
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "./home.jsx"; // Your main page
 import TrainModel from "./Pages/TrainModel.jsx"; // ML Training Page

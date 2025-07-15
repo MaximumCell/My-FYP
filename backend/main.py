@@ -1,3 +1,17 @@
+"""
+Physics Simulation & ML Project - Backend API
+===========================================
+
+This Flask application provides REST API endpoints for:
+- Machine Learning model training and testing
+- Physics simulation with visualization
+- Model recommendation system
+- Data processing and analysis
+
+Author: MaximumCell
+Project: My-FYP
+"""
+
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import os
