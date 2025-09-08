@@ -8,7 +8,8 @@ const handleFileUpload = async (e) => {
   formData.append("file", file);
 
   try {
-    const response = await axios.post("http://127.0.0.1:5000/recommend", formData);
+    const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+    const response = await axios.post(`${API}/ml/recommend`, formData);
     setRecommendedModel(response.data.recommended_model);
   } catch (error) {
     console.error("Error recommending model:", error);

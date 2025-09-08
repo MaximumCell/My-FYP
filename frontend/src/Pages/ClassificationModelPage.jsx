@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 
 const ClassificationModelPage = () => {
   const [models, setModels] = useState([]);
   const [file, setFile] = useState(null);
   const [columns, setColumns] = useState([]);
-  const [targetColumn, setTargetColumn] = useState('');
-  const [selectedModel, setSelectedModel] = useState('');
-  const [hyperparams, setHyperparams] = useState('{}');
+  const [targetColumn, setTargetColumn] = useState("");
+  const [selectedModel, setSelectedModel] = useState("");
+  const [hyperparams, setHyperparams] = useState("{}");
   const [accuracy, setAccuracy] = useState(null);
   const [precision, setPrecision] = useState(null);
   const [recall, setRecall] = useState(null);
@@ -15,17 +15,21 @@ const ClassificationModelPage = () => {
   const [confusionMatrix, setConfusionMatrix] = useState(null);
   const [rocAuc, setRocAuc] = useState(null);
   const [classNames, setClassNames] = useState([]);
-  const [downloadUrl, setDownloadUrl] = useState('');
-  const [error, setError] = useState('');
+  const [downloadUrl, setDownloadUrl] = useState("");
+  const [error, setError] = useState("");
   const [isTraining, setIsTraining] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [recommendedModel, setRecommendedModel] = useState('');
+  const [recommendedModel, setRecommendedModel] = useState("");
+  const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
 
   useEffect(() => {
-    axios.get('http://127.0.0.1:5000/models/classification')
-      .then(response => setModels(response.data))
-      .catch(error => console.error('Error fetching classification models:', error));
+    axios
+      .get(`${API}/ml/models/classification`)
+      .then((response) => setModels(response.data))
+      .catch((error) =>
+        console.error("Error fetching classification models:", error)
+      );
   }, []);
 
   const handleFileUpload = async (e) => {
@@ -33,18 +37,48 @@ const ClassificationModelPage = () => {
     if (uploadedFile) {
       setFile(uploadedFile);
       setColumns([]);
-      setTargetColumn('');
-      setRecommendedModel('');
+      setTargetColumn("");
+      setRecommendedModel("");
       const formData = new FormData();
-      formData.append('file', uploadedFile);
+      formData.append("file", uploadedFile);
       try {
-        const columnsResponse = await axios.post('http://127.0.0.1:5000/get_columns', formData);
-        setColumns(columnsResponse.data.columns);
-        const recommendResponse = await axios.post('http://127.0.0.1:5000/models/classification', formData);
-        setRecommendedModel(recommendResponse.data.recommended_model);
-      } catch (error) {
-        setError('Error processing file or getting columns/recommendation.');
-        console.error('Error processing file:', error);
+        const columnsResponse = await axios.post(
+          `${API}/ml/get_columns`,
+          formData
+        );
+        if (columnsResponse.data && columnsResponse.data.columns) {
+          setColumns(columnsResponse.data.columns);
+        } else {
+          setColumns([]);
+        }
+        const recommendResponse = await axios.post(
+          `${API}/ml/recommend`,
+          formData
+        );
+        if (
+          recommendResponse.data &&
+          recommendResponse.data.recommended_model
+        ) {
+          setRecommendedModel(recommendResponse.data.recommended_model);
+        }
+      } catch (err) {
+        // Extract helpful message from server when possible
+        let message =
+          "Error processing file or getting columns/recommendation.";
+        if (err.response) {
+          const data = err.response.data;
+          if (data) {
+            if (typeof data === "string") message = data;
+            else if (data.error) message = data.error;
+            else message = JSON.stringify(data);
+          } else {
+            message = err.response.statusText || String(err);
+          }
+        } else if (err.message) {
+          message = err.message;
+        }
+        setError(message);
+        console.error("Error processing file:", err);
         setFile(null);
       }
     }
@@ -52,10 +86,10 @@ const ClassificationModelPage = () => {
 
   const handleTrain = async () => {
     if (!file || !selectedModel || !targetColumn) {
-      setError('Please select a file, model, and target column.');
+      setError("Please select a file, model, and target column.");
       return;
     }
-    setError('');
+    setError("");
     setIsTraining(true);
     setAccuracy(null);
     setPrecision(null);
@@ -63,17 +97,20 @@ const ClassificationModelPage = () => {
     setF1Score(null);
     setConfusionMatrix(null);
     setRocAuc(null);
-    setDownloadUrl('');
+    setDownloadUrl("");
     setClassNames([]);
 
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('model', selectedModel);
-    formData.append('target_column', targetColumn);
-    formData.append('hyperparams', hyperparams);
+    formData.append("file", file);
+    formData.append("model", selectedModel);
+    formData.append("target_column", targetColumn);
+    formData.append("hyperparams", hyperparams);
 
     try {
-      const response = await axios.post('http://127.0.0.1:5000/train/classification', formData);
+      const response = await axios.post(
+        `${API}/ml/train/classification`,
+        formData
+      );
       if (response.data.error) {
         setError(response.data.error);
       } else {
@@ -84,14 +121,30 @@ const ClassificationModelPage = () => {
         setConfusionMatrix(response.data.confusion_matrix);
         setRocAuc(response.data.roc_auc);
         setClassNames(response.data.class_names);
-        const pathParts = response.data.model_path.split('\\');
+        const pathParts = response.data.model_path.split("\\");
         const filenameWithExtension = pathParts[pathParts.length - 1];
-        const modelName = filenameWithExtension.replace('_classifier_pipeline.pkl', '');
+        const modelName = filenameWithExtension.replace(
+          "_classifier_pipeline.pkl",
+          ""
+        );
         setDownloadUrl(modelName);
       }
-    } catch (error) {
-      setError('Error training classification model.');
-      console.error('Error training classification model:', error);
+    } catch (err) {
+      let message = "Error training classification model.";
+      if (err.response) {
+        const data = err.response.data;
+        if (data) {
+          if (typeof data === "string") message = data;
+          else if (data.error) message = data.error;
+          else message = JSON.stringify(data);
+        } else {
+          message = err.response.statusText || String(err);
+        }
+      } else if (err.message) {
+        message = err.message;
+      }
+      setError(message);
+      console.error("Error training classification model:", err);
     }
     setIsTraining(false);
   };
@@ -104,9 +157,7 @@ const ClassificationModelPage = () => {
     >
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">
-            Train Classification Model
-          </h1>
+          <h1 className="text-3xl font-bold">Train Classification Model</h1>
           <button
             onClick={() => setDarkMode(!darkMode)}
             className={`px-4 py-2 rounded-lg transition-colors ${
@@ -293,7 +344,7 @@ const ClassificationModelPage = () => {
               : "bg-blue-500 hover:bg-blue-600"
           }`}
         >
-          {isTraining ? 'Training...' : 'Train Model'}
+          {isTraining ? "Training..." : "Train Model"}
         </button>
 
         {accuracy !== null && (
@@ -311,18 +362,32 @@ const ClassificationModelPage = () => {
                   <table className="table-auto border-collapse border border-gray-500">
                     <thead>
                       <tr>
-                        <th className="border border-gray-500 px-4 py-2">Predicted</th>
+                        <th className="border border-gray-500 px-4 py-2">
+                          Predicted
+                        </th>
                         {classNames.map((className) => (
-                          <th key={className} className="border border-gray-500 px-4 py-2">{className}</th>
+                          <th
+                            key={className}
+                            className="border border-gray-500 px-4 py-2"
+                          >
+                            {className}
+                          </th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {confusionMatrix.map((row, index) => (
                         <tr key={index}>
-                          <td className="border border-gray-500 px-4 py-2 font-semibold">Actual {classNames[index]}</td>
+                          <td className="border border-gray-500 px-4 py-2 font-semibold">
+                            Actual {classNames[index]}
+                          </td>
                           {row.map((value, colIndex) => (
-                            <td key={colIndex} className="border border-gray-500 px-4 py-2 text-center">{value}</td>
+                            <td
+                              key={colIndex}
+                              className="border border-gray-500 px-4 py-2 text-center"
+                            >
+                              {value}
+                            </td>
                           ))}
                         </tr>
                       ))}
@@ -334,7 +399,7 @@ const ClassificationModelPage = () => {
             {downloadUrl && (
               <div className="mt-4">
                 <a
-                  href={`http://127.0.0.1:5000/download/classification/${downloadUrl}`}
+                  href={`${API}/ml/download/classification/${downloadUrl}`}
                   className="inline-block bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
                   download={`trained_classification_model_${selectedModel}.pkl`}
                 >

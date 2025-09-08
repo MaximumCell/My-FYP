@@ -102,8 +102,44 @@ def train_model(file, model_name, target_column=None, test_size=0.2, hyperparams
     os.makedirs(model_dir, exist_ok=True)
     model_path = os.path.join(model_dir, f"{model_name}_pipeline.pkl")
 
+    # Try to get feature names after preprocessing (sklearn >=1.0 supports get_feature_names_out)
+    feature_names = X.columns.tolist()
+    feature_names_out = None
     try:
-        joblib.dump(full_pipeline, model_path)
+        # Attempt to get feature names out from the preprocessor
+        feature_names_out = preprocessor.get_feature_names_out(feature_names)
+    except Exception:
+        # fallback: try to build a reasonable feature list
+        try:
+            # If transformers_ exists, attempt to collect transformer output names
+            fn_out = []
+            for name, transformer, cols in preprocessor.transformers_:
+                if name == 'remainder' and preprocessor.remainder == 'passthrough':
+                    continue
+                # cols may be an Index or list
+                if hasattr(cols, 'tolist'):
+                    cols_list = cols.tolist()
+                else:
+                    cols_list = list(cols) if cols is not None else []
+                # For onehot encoding, we can't know categories here reliably; append original col names
+                fn_out.extend(cols_list)
+            if fn_out:
+                feature_names_out = fn_out
+        except Exception:
+            feature_names_out = None
+
+    try:
+        joblib.dump({
+            'pipeline': full_pipeline,
+            'feature_names': feature_names,
+            'feature_names_out': list(feature_names_out) if feature_names_out is not None else None,
+            'target_column': target_column,
+            'config': {
+                'test_size': test_size,
+                'scaling_method': scaling_method,
+                'hyperparams': hyperparams
+            }
+        }, model_path)
     except Exception as e:
         return {"error": f"Error saving the trained pipeline: {e}"}
 
@@ -121,34 +157,58 @@ def test_model(model_name, new_data):
 
     if not os.path.exists(model_path):
         return {"error": "Model not found"}
+    # Load saved model data (may contain pipeline and metadata)
+    try:
+        model_data = joblib.load(model_path)
+    except Exception as e:
+        return {"error": f"Error loading model: {e}"}
 
-    full_pipeline = joblib.load(model_path)
-    preprocessor = full_pipeline.named_steps['preprocessor']
+    # Support older saved pipelines where only the pipeline object was saved
+    if isinstance(model_data, dict):
+        full_pipeline = model_data.get('pipeline')
+        feature_names_out = model_data.get('feature_names_out')
+        feature_names = model_data.get('feature_names')
+    else:
+        full_pipeline = model_data
+        feature_names_out = None
+        feature_names = None
 
-    print("Preprocessor transformers:")
-    feature_names_from_pipeline = []
-    for name, transformer, columns in preprocessor.transformers_:
-        print(f"  Name: {name}, Columns: {columns}")
-        if not columns.empty:
-            feature_names_from_pipeline.extend(columns.tolist())
-        elif name == 'remainder' and preprocessor.remainder == 'passthrough':
-            # If you had passthrough columns, you'd need to know their names here
-            # For example, if you stored them during training:
-            # feature_names_from_pipeline.extend(passthrough_column_names)
-            pass
+    if full_pipeline is None:
+        return {"error": "Invalid model file: pipeline not found."}
 
-    print(f"Expected feature names from pipeline: {feature_names_from_pipeline}")
-    print(f"Received test data keys: {new_data.keys()}")
+    # Prefer feature_names_out (already transformed names), else fallback to original feature names
+    expected_features = None
+    if feature_names_out:
+        expected_features = list(feature_names_out)
+    elif feature_names:
+        expected_features = list(feature_names)
+    else:
+        # As a last resort, try to derive from the preprocessor (may fail for older sklearn)
+        try:
+            preprocessor = full_pipeline.named_steps.get('preprocessor')
+            if preprocessor is not None and hasattr(preprocessor, 'get_feature_names_out'):
+                # Need original input column names; try to use new_data keys as columns
+                expected_features = list(preprocessor.get_feature_names_out(list(new_data.keys())))
+            else:
+                expected_features = list(new_data.keys())
+        except Exception:
+            expected_features = list(new_data.keys())
 
-    if set(feature_names_from_pipeline) != set(new_data.keys()):
-        return {"error": "Missing or extra features in input data."}
+    # Validate input keys
+    input_keys = list(new_data.keys())
+    missing = [f for f in expected_features if f not in input_keys]
+    extra = [k for k in input_keys if k not in expected_features]
+    if missing or extra:
+        msg_parts = []
+        if missing:
+            msg_parts.append(f"missing: {missing}")
+        if extra:
+            msg_parts.append(f"extra: {extra}")
+        return {"error": f"Feature mismatch. {', '.join(msg_parts)}"}
 
     try:
-        new_data_df = pd.DataFrame([new_data])[feature_names_from_pipeline]
-        print("Shape of test DataFrame before prediction:", new_data_df.shape)
+        new_data_df = pd.DataFrame([new_data])[expected_features]
         predictions = full_pipeline.predict(new_data_df)
-        print("Predictions shape:", predictions.shape)
         return {"predictions": predictions.tolist()}
     except Exception as e:
-        print(f"Error during prediction: {e}")
         return {"error": f"Error during prediction: {e}"}

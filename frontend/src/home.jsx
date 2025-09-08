@@ -3,9 +3,8 @@ import Header from "./Header.jsx";
 import Hero from "./Hero.jsx";
 import MLSection from "./MLSection.jsx";
 import About from "./componants/About.jsx";
-import MathAI from "./componants/MathAi.jsx";
+import MathAI from "./componants/MathAI.jsx";
 import Simulation from "./componants/Simulation.jsx";
-
 
 const home = () => {
   return (
@@ -30,7 +29,7 @@ const home = () => {
         <Footer />
       </main>
     </>
-  )
-}
+  );
+};
 
-export default home
+export default home;
