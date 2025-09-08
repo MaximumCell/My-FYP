@@ -1,0 +1,64 @@
+# Backend Upgrade Plan for FYP Project
+# Repository: My-FYP (Owner: MaximumCell, Branch: feature/new-updates)
+# Date: August 30, 2025
+
+## Overview
+Upgrade the Flask backend to support advanced ML, simulations, and AI tutoring. Focus on open-source, cost-free solutions (e.g., Gemini API free tier). Prepare for Next.js frontend migration.
+
+## Key Features
+- **ML Enhancements**: Auto-model selection (speed + accuracy), support for CSV + images.
+- **Simulation Tab**: Use Pygame (2D interactive) and VPython (3D visualizations). Manim for future animations.
+- **AI Tutor**: RAG with Gemini API for physics education (classical to quantum).
+
+## Phases
+1. **Phase 1: Enhanced ML**
+   - Add image support (PIL/OpenCV).
+   - Auto-selection: Train models (Scikit-learn + PyTorch for deep learning), evaluate speed/accuracy, recommend best.
+   - Support deep learning for images (e.g., CNNs with PyTorch).
+   - Endpoint: /auto_train
+
+2. **Phase 2: Better Simulations**
+   - Integrate Pygame: 2D sims (e.g., particles, collisions).
+   - Integrate VPython: 3D sims (e.g., vectors, orbits).
+   - On-demand AI images via Gemini (context-aware).
+   - Endpoint: /advanced_simulation
+
+3. **Phase 3: AI Physics Tutor**
+   - RAG setup: Load PDFs, chunk, retrieve context.
+   - Tutor: Q&A, derivations, explanations, image gen on request.
+   - Endpoint: /ai_tutor
+
+4. **Phase 4: Integration & Testing**
+   - Update existing endpoints.
+   - Add logging, validation.
+   - Test with samples.
+
+## Backend Structure
+- backend/
+  - app.py (main app)
+  - routes/ (ml_routes.py, simulation_routes.py, ai_routes.py) - directly call ml/ and simulation/
+  - ml/ (train_model.py, train_classifier.py, etc.)
+  - simulation/ (run_simulation.py)
+  - ai/ (future AI files)
+  - models/, utils/, plots/, trained_models/
+
+## Tech Stack
+- Python, Flask, Scikit-learn, SymPy, Matplotlib
+- New: Pygame, VPython, LangChain, Gemini API, PyTorch (for deep learning)
+- Free alternatives: Optuna for tuning, FAISS for RAG
+
+## Timeline
+- Phase 1: 1 week
+- Phase 2: 1 week
+- Phase 3: 1-2 weeks
+- Total: 3-4 weeks
+
+## Next Steps
+- Start with Phase 1 (ML).
+- Integrate Pygame/VPython into run_simulation.py.
+- Test Gemini API limits.
+
+## Notes
+- Budget: Free (Gemini free tier).
+- Frontend: 3 pages (ML, Simulation, AI Tutor) for Next.js.
+- Questions: Confirm library preferences, test data.
