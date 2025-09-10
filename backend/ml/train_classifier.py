@@ -125,9 +125,38 @@ def train_classifier(file, model_name, target_column=None, test_size=0.2, hyperp
     model_path = os.path.join(model_dir, f"{model_name}_classifier_pipeline.pkl")
 
     try:
+        # Attempt to capture input and transformed feature names
+        feature_names = X.columns.tolist()
+        feature_names_out = None
+        try:
+            feature_names_out = preprocessor.get_feature_names_out(feature_names)
+        except Exception:
+            try:
+                fn_out = []
+                for name, transformer, cols in preprocessor.transformers_:
+                    if name == 'remainder' and preprocessor.remainder == 'passthrough':
+                        continue
+                    if hasattr(cols, 'tolist'):
+                        cols_list = cols.tolist()
+                    else:
+                        cols_list = list(cols) if cols is not None else []
+                    fn_out.extend(cols_list)
+                if fn_out:
+                    feature_names_out = fn_out
+            except Exception:
+                feature_names_out = None
+
         joblib.dump({
             'pipeline': full_pipeline,
-            'class_names': class_names
+            'class_names': class_names,
+            'feature_names': feature_names,
+            'feature_names_out': list(feature_names_out) if feature_names_out is not None else None,
+            'target_column': target_column,
+            'config': {
+                'test_size': test_size,
+                'scaling_method': scaling_method,
+                'hyperparams': hyperparams
+            }
         }, model_path)
     except Exception as e:
         return {"error": f"Error saving the trained classifier pipeline: {e}"}

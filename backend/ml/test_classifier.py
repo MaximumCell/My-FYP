@@ -12,8 +12,16 @@ def test_classifier(model_name, new_data):
 
     try:
         model_data = joblib.load(model_path)
-        full_pipeline = model_data['pipeline']  # Load the pipeline
-        class_names = model_data['class_names'] # Load class names
+        if isinstance(model_data, dict):
+            full_pipeline = model_data.get('pipeline')
+            class_names = model_data.get('class_names')
+            feature_names_out = model_data.get('feature_names_out')
+            feature_names = model_data.get('feature_names')
+        else:
+            full_pipeline = model_data
+            class_names = None
+            feature_names_out = None
+            feature_names = None
     except Exception as e:
         return {"error": f"Error loading the classifier model: {e}"}
 
@@ -21,29 +29,51 @@ def test_classifier(model_name, new_data):
     if not isinstance(new_data, dict):
         return {"error": "Input data must be a dictionary with feature names as keys."}
 
-    # Get the feature names the model was trained on (excluding the target)
-    feature_names_from_pipeline = full_pipeline.named_steps['preprocessor'].transformers_[0][2].tolist() + \
-                                    list(full_pipeline.named_steps['preprocessor'].transformers_[1][2])
+    # Determine expected features
+    if feature_names_out:
+        expected_features = list(feature_names_out)
+    elif feature_names:
+        expected_features = list(feature_names)
+    else:
+        # fallback: try to derive from preprocessor if possible
+        try:
+            preprocessor = full_pipeline.named_steps.get('preprocessor')
+            if preprocessor is not None and hasattr(preprocessor, 'get_feature_names_out'):
+                # attempt to derive using incoming new_data keys as base
+                expected_features = list(preprocessor.get_feature_names_out(list(new_data.keys())))
+            else:
+                expected_features = list(new_data.keys())
+        except Exception:
+            expected_features = list(new_data.keys())
 
-    # Ensure all expected features are present in the input data
-    if set(feature_names_from_pipeline) != set(new_data.keys()):
-        return {"error": "Missing or extraneous features in input data."}
+    # Validate input keys
+    missing = [f for f in expected_features if f not in new_data.keys()]
+    extra = [k for k in new_data.keys() if k not in expected_features]
+    if missing or extra:
+        msg = ''
+        if missing:
+            msg += f"missing: {missing}. "
+        if extra:
+            msg += f"extra: {extra}."
+        return {"error": f"Feature mismatch. {msg}"}
 
     try:
-        # Create DataFrame with correct column order
-        new_data_df = pd.DataFrame([new_data])[feature_names_from_pipeline]
-
-        # Make predictions
+        new_data_df = pd.DataFrame([new_data])[expected_features]
         predictions = full_pipeline.predict(new_data_df)
-        predicted_classes = [class_names[i] for i in predictions] # Convert numerical predictions to original class names
+        predicted_classes = None
+        if class_names is not None:
+            predicted_classes = [class_names[i] for i in predictions]
 
-        # Get probabilities (if available)
         probabilities = None
-        if hasattr(full_pipeline, "predict_proba"):
-            probabilities = full_pipeline.predict_proba(new_data_df).tolist()
+        # If pipeline has predict_proba method at top-level
+        try:
+            if hasattr(full_pipeline, 'predict_proba'):
+                probabilities = full_pipeline.predict_proba(new_data_df).tolist()
+        except Exception:
+            probabilities = None
 
         result = {
-            "predictions": predicted_classes,
+            "predictions": predicted_classes if predicted_classes is not None else predictions.tolist(),
             "probabilities": probabilities,
             "class_names": class_names
         }

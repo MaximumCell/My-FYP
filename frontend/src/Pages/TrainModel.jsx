@@ -26,8 +26,9 @@ const TrainModel = () => {
 
   // Fetch available models on component mount
   useEffect(() => {
+    const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
     axios
-      .get("http://127.0.0.1:5000/models/regression")
+      .get(`${API}/ml/models/regression`)
       .then((response) => setModels(response.data))
       .catch((error) => console.error("Error fetching models:", error));
   }, []);
@@ -46,16 +47,16 @@ const TrainModel = () => {
 
       try {
         // Fetch column names from the backend
+        const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
         const columnsResponse = await axios.post(
-          "http://127.0.0.1:5000/get_columns", // New backend endpoint
+          `${API}/ml/get_columns`,
           formData
         );
         setColumns(columnsResponse.data.columns);
 
         // Fetch model recommendation (using the same file upload)
-        // Corrected the typo in the URL here
         const recommendResponse = await axios.post(
-          "http://127.0.0.1:5000/recommend",
+          `${API}/ml/recommend`,
           formData
         );
         setRecommendedModel(recommendResponse.data.recommended_model);
@@ -94,10 +95,8 @@ const TrainModel = () => {
     formData.append("target_column", targetColumn); // Include selected target column
 
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:5000/train/regression",
-        formData
-      );
+      const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+      const response = await axios.post(`${API}/ml/train/regression`, formData);
       // console.log("Response:", response.data);
 
       if (response.data.error) {
@@ -107,18 +106,20 @@ const TrainModel = () => {
         // console.log("Model Path:", fullModelPath);
 
         // Find the last index of the backslash
-        const lastBackslashIndex = fullModelPath.lastIndexOf('\\');
+        const lastBackslashIndex = fullModelPath.lastIndexOf("\\");
 
         let filenameWithExtension;
         if (lastBackslashIndex !== -1) {
           // Extract the filename including the extension
-          filenameWithExtension = fullModelPath.substring(lastBackslashIndex + 1);
+          filenameWithExtension = fullModelPath.substring(
+            lastBackslashIndex + 1
+          );
         } else {
           // If no backslash, assume the path is just the filename
           filenameWithExtension = fullModelPath;
         }
 
-        const modelName = filenameWithExtension.replace('_pipeline.pkl', '');
+        const modelName = filenameWithExtension.replace("_pipeline.pkl", "");
         // console.log("Filename with Extension:", filenameWithExtension);
         // console.log("Model Name:", modelName);
 
@@ -148,20 +149,39 @@ const TrainModel = () => {
     setIsTesting(true);
 
     try {
-      const response = await axios.post(
-        "http://127.0.0.1:5000/test/regression",
-        {
-          model: selectedModel,
-          new_data: testData, // Send an object of feature: value
-        }
-      );
+      const API = import.meta.env.VITE_API_URL || "http://127.0.0.1:5000";
+      const response = await axios.post(`${API}/ml/test/regression`, {
+        model: selectedModel,
+        new_data: testData, // Send an object of feature: value
+      });
 
-      if (response.data.predictions && response.data.predictions.length > 0) {
+      if (response.data.error) {
+        setError(response.data.error);
+      } else if (
+        response.data.predictions &&
+        response.data.predictions.length > 0
+      ) {
         setPredictions(response.data.predictions);
+      } else {
+        setError("No predictions returned from server.");
       }
-    } catch (error) {
-      setError(error.response?.data?.error || "Unknown error occurred.");
-      console.error("Error testing model:", error);
+    } catch (err) {
+      // Build a helpful error message from server response when possible
+      let message = "Unknown error occurred.";
+      if (err.response) {
+        const data = err.response.data;
+        if (data) {
+          if (typeof data === "string") message = data;
+          else if (data.error) message = data.error;
+          else message = JSON.stringify(data);
+        } else {
+          message = err.response.statusText || String(err);
+        }
+      } else if (err.message) {
+        message = err.message;
+      }
+      setError(message);
+      console.error("Error testing model:", err);
     }
     setIsTesting(false);
   };
@@ -418,24 +438,26 @@ const TrainModel = () => {
         </button>
 
         {/* Metrics */}
-{mse !== null && (
-    <div className="mt-6 p-4 rounded-lg bg-green-50 border border-green-500">
-        <p className="text-green-700">MSE: {mse.toFixed(4)}</p>
-        <p className="text-green-700">R² Score: {r2.toFixed(4)}</p>
-        <p className="text-green-700">MAE: {mae.toFixed(4)}</p>
-        {downloadUrl && (
-            <div className="mt-4">
+        {mse !== null && (
+          <div className="mt-6 p-4 rounded-lg bg-green-50 border border-green-500">
+            <p className="text-green-700">MSE: {mse.toFixed(4)}</p>
+            <p className="text-green-700">R² Score: {r2.toFixed(4)}</p>
+            <p className="text-green-700">MAE: {mae.toFixed(4)}</p>
+            {downloadUrl && (
+              <div className="mt-4">
                 <a
-                    href={`http://127.0.0.1:5000/download/regression/${downloadUrl}`}
-                    className="inline-block bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
-                    download={`trained_model_${selectedModel}.pkl`}
+                  href={`${
+                    import.meta.env.VITE_API_URL || "http://127.0.0.1:5000"
+                  }/ml/download/regression/${downloadUrl}`}
+                  className="inline-block bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                  download={`trained_model_${selectedModel}.pkl`}
                 >
-                    Download Model
+                  Download Model
                 </a>
-            </div>
+              </div>
+            )}
+          </div>
         )}
-    </div>
-)}
 
         {/* Test Section */}
         <h2 className="text-2xl font-bold mt-8 mb-6">Test Your Model</h2>
