@@ -1,13 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import sympy as sp
 import os
-import re
-from flask import jsonify, send_file
-import matplotlib
-matplotlib.use('Agg')
+from .plot_2d import plot_equation_2d, plot_from_csv_columns
+from .plot_3d import plot_surface, plot_parametric
+from .utils import ensure_plots_dir
 
-# Updated predefined physics equations without sp. prefix
+
 PREDEFINED_EQUATIONS = {
     "Projectile Motion (y = v*x - 0.5*g*x^2)": "v*x - 0.5*g*x**2",
     "Simple Harmonic Motion (y = A*sin(w*x))": "A * sin(w * x)",
@@ -16,136 +12,71 @@ PREDEFINED_EQUATIONS = {
     "Linear Motion (y = m*x + c)": "m*x + c"
 }
 
-# Default values for variables
-DEFAULT_VALUES = {
-    "v": 10.0,
-    "g": 9.8,
-    "A": 5.0,
-    "w": 2.0,
-    "k": 0.5,
-    "b": 0.2,
-    "m": 2.0,
-    "c": 3.0
-}
 
-def run_simulation(data):
+def run_simulation(data, files=None, host_url=''):
+    """Unified entry for simulation requests.
+
+    data: dict of parameters
+    files: dict-like for uploaded files (Flask request.files)
+    host_url: base URL (optional) to prefix returned HTML paths
     """
-    Process mathematical equations and generate plots,
-    handling both predefined and custom equations with variable substitution.
-    """
-    equation_str = data.get("equation", "")
-    x_min = float(data.get("x_min", -10))
-    x_max = float(data.get("x_max", 10))
-    variables = data.get("variables", {})
-    
-    if not equation_str:
-        return {"error": "No equation provided"}
-    
-    # Convert empty string values to None
-    variables = {k: v for k, v in variables.items() if v is not None and v != ""}
-    
+    ensure_plots_dir()
+    mode = data.get('mode', 'equation')
     try:
-        # If a predefined equation is selected, substitute variables
-        if equation_str in PREDEFINED_EQUATIONS:
-            equation_template = PREDEFINED_EQUATIONS[equation_str]
-            
-            # Create a sympy expression with symbolic variables
-            x = sp.symbols('x')
-            
-            # Create symbols for all parameters
-            param_symbols = {}
-            for var_name in DEFAULT_VALUES:
-                param_symbols[var_name] = sp.symbols(var_name)
-            
-            # Parse the equation template
-            expr = sp.sympify(equation_template, locals=param_symbols)
-            
-            # Substitute values for each parameter
-            for var_name in DEFAULT_VALUES:
-                # Get the value (user-provided or default)
-                if var_name in variables:
-                    value = float(variables[var_name])
-                else:
-                    value = DEFAULT_VALUES[var_name]
-                
-                # Substitute the value into the expression
-                expr = expr.subs(param_symbols[var_name], value)
-            
-            # Convert back to string for further processing
-            equation_str = str(expr)
-        
-        # Define symbol for x
-        x = sp.symbols('x')
-        expr = sp.sympify(equation_str)  # Convert string to symbolic expression
+        if mode == 'equation':
+            eq = data.get('equation')
+            x_min = float(data.get('x_min', -10))
+            x_max = float(data.get('x_max', 10))
+            res = int(data.get('resolution', 1000))
+            # support predefined
+            if eq in PREDEFINED_EQUATIONS:
+                eq = PREDEFINED_EQUATIONS[eq]
+            out = plot_equation_2d(eq, x_min=x_min, x_max=x_max, resolution=res)
+            # prefix host if provided
+            if host_url:
+                out['html_url'] = host_url + '/simulation/download/' + os.path.basename(out['html_path'])
+                out['png_url'] = host_url + '/simulation/download/' + os.path.basename(out['png_path']) if out['png_path'] else None
+            return out
 
-        # Convert to a function
-        f_lambdified = sp.lambdify(x, expr, "numpy")
+        if mode == 'csv':
+            # files expected
+            if not files or 'file' not in files:
+                return {'error': 'CSV file required for csv plotting'}
+            header, rows = None, None
+            from .utils import read_csv_file
+            header, rows = read_csv_file(files['file'])
+            x_col = data.get('x_col')
+            y_col = data.get('y_col')
+            out = plot_from_csv_columns(header, rows, x_col, y_col)
+            if host_url:
+                out['html_url'] = host_url + '/simulation/download/' + os.path.basename(out['html_path'])
+                out['png_url'] = host_url + '/simulation/download/' + os.path.basename(out['png_path']) if out['png_path'] else None
+            return out
 
-        # Generate x values and evaluate function
-        x_vals = np.linspace(x_min, x_max, 1000)  # Increased resolution for smoother plots
-        
-        # Safely evaluate with handling for potential errors
-        try:
-            y_vals = f_lambdified(x_vals)
-            
-            # Check for invalid values
-            if np.any(np.isnan(y_vals)) or np.any(np.isinf(y_vals)):
-                return {"error": "Equation produces invalid values (NaN or Infinity)"}
-        except Exception as calc_error:
-            return {"error": f"Error calculating values: {str(calc_error)}"}
+        if mode == '3d_surface':
+            eq = data.get('equation')
+            x_min = float(data.get('x_min', -5))
+            x_max = float(data.get('x_max', 5))
+            y_min = float(data.get('y_min', -5))
+            y_max = float(data.get('y_max', 5))
+            res = int(data.get('resolution', 100))
+            out = plot_surface(eq, x_min=x_min, x_max=x_max, y_min=y_min, y_max=y_max, resolution=res)
+            if host_url:
+                out['html_url'] = host_url + '/simulation/download/' + os.path.basename(out['html_path'])
+            return out
 
-        # Create and save plot
-        plt.figure(figsize=(10, 6))
-        plt.plot(x_vals, y_vals, linewidth=2.5, color="#3366CC")
-        plt.xlabel("x-axis", fontsize=12)
-        plt.ylabel("y-axis", fontsize=12)
-        plt.title(f"Plot of: {equation_str}", fontsize=14)
-        plt.grid(True, alpha=0.3)
-        
-        # Add zero axes if they're in the view
-        if x_min <= 0 <= x_max:
-            plt.axvline(x=0, color='k', linestyle='-', alpha=0.2)
-        
-        y_min, y_max = plt.ylim()
-        if y_min <= 0 <= y_max:
-            plt.axhline(y=0, color='k', linestyle='-', alpha=0.2)
-        
-        # Save the plot - use a consistent filename to match your download_plot route
-        os.makedirs("plots", exist_ok=True)
-        plot_path = "plots/simulation_plot.png"
-        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-        plt.close()
+        if mode == '3d_param':
+            x_expr = data.get('x_expr')
+            y_expr = data.get('y_expr')
+            z_expr = data.get('z_expr')
+            t_min = float(data.get('t_min', 0))
+            t_max = float(data.get('t_max', 10))
+            res = int(data.get('resolution', 200))
+            out = plot_parametric(x_expr, y_expr, z_expr, t_min=t_min, t_max=t_max, resolution=res)
+            if host_url:
+                out['html_url'] = host_url + '/simulation/download/' + os.path.basename(out['html_path'])
+            return out
 
-        return {
-            "message": "Simulation completed", 
-            "plot_url": "/download_plot",
-            "equation": equation_str
-        }
-
+        return {'error': 'Unsupported simulation mode'}
     except Exception as e:
-        return {"error": f"Error processing equation: {str(e)}"}
-
-# Assuming you have Flask routes set up to call this function
-# Here's a sample route implementation that should be in your main Flask app file:
-
-"""
-from flask import Flask, request, send_file
-from flask_cors import CORS
-import os
-
-app = Flask(__name__)
-CORS(app)
-
-@app.route('/simulation', methods=['POST'])
-def simulation():
-    data = request.json
-    result = run_simulation(data)
-    return jsonify(result)
-
-@app.route('/download_plot')
-def download_plot():
-    return send_file('plots/simulation_plot.png', mimetype='image/png')
-
-if __name__ == '__main__':
-    app.run(debug=True)
-"""
+        return {'error': str(e)}
