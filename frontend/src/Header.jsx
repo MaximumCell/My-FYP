@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import logo from "./assets/logo.jpg";
+import ThemeToggle from "./components/ThemeToggle";
+import { Sun, Moon, Menu } from "lucide-react";
 
 const Header = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -53,7 +55,7 @@ const Header = () => {
           </h1>
 
           {/* Desktop Navigation */}
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-6">
             <nav className="flex-1 flex justify-center items-center gap-8 max-lg:hidden">
               <ul className="flex space-x-8">
                 <li>
@@ -128,15 +130,21 @@ const Header = () => {
                 </li>
               </ul>
             </nav>
+
+            {/* theme toggle */}
+            <div className="hidden lg:flex items-center">
+              <ThemeToggle />
+            </div>
           </div>
 
           {/* Mobile Menu Toggle */}
-          <div className="lg:hidden">
+          <div className="lg:hidden flex items-center gap-2">
+            <ThemeToggle />
             <button
               onClick={toggleMobileMenu}
               className="p-2 focus:outline-none"
             >
-              <i className="fa-solid fa-bars text-2xl"></i>
+              <Menu className="w-6 h-6" />
             </button>
           </div>
         </div>

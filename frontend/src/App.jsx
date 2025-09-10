@@ -12,7 +12,7 @@
  */
 
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import Home from "./home.jsx"; // Your main page
+import {Home} from "./home.jsx"; // Your main page
 import TrainModel from "./Pages/TrainModel.jsx"; // ML Training Page
 import SimulationPage from "./Pages/SimulationPage.jsx";
 import MLPage from "./Pages/MLPage.jsx";

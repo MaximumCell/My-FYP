@@ -1,35 +1,38 @@
 import Footer from "./Footer.jsx";
 import Header from "./Header.jsx";
-import Hero from "./Hero.jsx";
 import MLSection from "./MLSection.jsx";
-import About from "./componants/About.jsx";
-import MathAI from "./componants/MathAI.jsx";
-import Simulation from "./componants/Simulation.jsx";
+import About from "./components/About.jsx";
+import Hero from "./Hero.jsx";
+import Carousel from "./components/Carousel.jsx";
+import MathAI from "./components/MathAI.jsx";
 
-const home = () => {
+export const Home = () => {
   return (
-    <>
-      <main>
-        <Header />
-        <section id="home" className="scroll-mt-25">
-          <Hero />
-        </section>
-        <section id="ml-box" className="scroll-mt-25">
-          <MLSection />
-        </section>
-        <section id="simulation" className="scroll-mt-25">
-          <Simulation />
-        </section>
-        <section id="tutor" className="scroll-mt-25">
-          <MathAI />
-        </section>
-        <section id="About" className="scroll-mt-10">
-          <About />
-        </section>
-        <Footer />
-      </main>
-    </>
+    <main className="min-h-screen bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+      <Header />
+
+      {/* Fullscreen carousel hero
+      <section id="home" className="w-full h-screen">
+        <Carousel />
+      </section> */}
+
+      {/* Brief intro under carousel */}
+      <section id="intro" className="w-full mx-auto px-0 py-0">
+        <Hero />
+      </section>
+      <section id="ml-box">
+        <MLSection />
+      </section>
+
+      <section id="tutor" >
+        <MathAI />
+      </section>
+
+      <section id="About">
+        <About />
+      </section>
+
+      <Footer />
+    </main>
   );
 };
-
-export default home;
