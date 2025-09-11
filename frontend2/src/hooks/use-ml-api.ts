@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
-import type { 
+import type {
   ApiError,
   ModelList,
   ColumnsResponse,
@@ -49,6 +49,15 @@ export const useTrainModel = (type: ModelType) => {
       formData.append('model', params.model);
       if (params.target_column) {
         formData.append('target_column', params.target_column);
+      }
+      if (params.test_size !== undefined) {
+        formData.append('test_size', String(params.test_size));
+      }
+      if (params.scaling_method) {
+        formData.append('scaling_method', params.scaling_method);
+      }
+      if (params.hyperparams) {
+        formData.append('hyperparams', JSON.stringify(params.hyperparams));
       }
       const { data } = await api.post(`/ml/train/${type}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },

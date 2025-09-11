@@ -48,7 +48,7 @@ export default function Home() {
               description="Upload your data to train, test, and download regression and classification models. Get model recommendations tailored to your dataset."
               link="/ml"
               linkText="Explore ML Tools"
-              imageUrl="https://picsum.photos/seed/data-science/600/400"
+              imageUrl="/images/ML.jpg"
               imageHint="data analysis"
             />
             <FeatureCard
@@ -57,7 +57,7 @@ export default function Home() {
               description="Visualize complex physics equations. Use predefined models or input your own custom equations and variables to see concepts in action."
               link="/simulation"
               linkText="Run a Simulation"
-              imageUrl="https://picsum.photos/seed/physics-atoms/600/400"
+              imageUrl="/images/physimimg.jpg"
               imageHint="science experiment"
             />
             <FeatureCard
@@ -66,7 +66,7 @@ export default function Home() {
               description="Your personal AI assistant for physics. Get explanations for complex topics and help with your coursework. (Coming Soon!)"
               link="/ai"
               linkText="Meet the Tutor"
-              imageUrl="https://picsum.photos/seed/artificial-intelligence/600/400"
+              imageUrl="/images/Ai_me.jpg"
               imageHint="robot thinking"
             />
           </div>
@@ -79,21 +79,21 @@ export default function Home() {
 function FeatureCard({ icon, title, description, link, linkText, imageUrl, imageHint }: { icon: React.ReactNode, title: string, description: string, link: string, linkText: string, imageUrl: string, imageHint: string }) {
   return (
     <Card className="w-full max-w-4xl mx-auto overflow-hidden shadow-lg hover:shadow-primary/20 transition-all duration-300">
-        <div className="grid md:grid-cols-2">
-            <div className="relative h-64 md:h-auto">
-                <Image src={imageUrl} alt={title} layout="fill" objectFit="cover" data-ai-hint={imageHint} />
-            </div>
-            <div className="flex flex-col justify-center p-8 text-left">
-                <div className="flex items-center gap-4 mb-4">
-                    {icon}
-                    <CardTitle className="text-3xl">{title}</CardTitle>
-                </div>
-                <CardDescription className="mb-6 text-base">{description}</CardDescription>
-                <Button variant="link" asChild className="mt-auto text-primary p-0 justify-start">
-                    <Link href={link}>{linkText} &rarr;</Link>
-                </Button>
-            </div>
+      <div className="grid md:grid-cols-2">
+        <div className="relative h-64 md:h-auto">
+          <Image src={imageUrl} alt={title} fill style={{ objectFit: 'cover' }} data-ai-hint={imageHint} />
         </div>
+        <div className="flex flex-col justify-center p-8 text-left">
+          <div className="flex items-center gap-4 mb-4">
+            {icon}
+            <CardTitle className="text-3xl">{title}</CardTitle>
+          </div>
+          <CardDescription className="mb-6 text-base">{description}</CardDescription>
+          <Button variant="link" asChild className="mt-auto text-primary p-0 justify-start">
+            <Link href={link}>{linkText} &rarr;</Link>
+          </Button>
+        </div>
+      </div>
     </Card>
   );
 }

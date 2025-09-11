@@ -13,6 +13,9 @@ export interface TrainParams {
   file: File;
   model: string;
   target_column?: string;
+  test_size?: number;
+  scaling_method?: string;
+  hyperparams?: Record<string, any>;
 }
 export interface TrainResponse {
   message: string;
@@ -27,7 +30,8 @@ export interface TrainResponse {
 // /ml/test/*
 export interface TestParams {
   model: string;
-  new_data: Record<string, any>[];
+  // single example object (backend expects a dict of feature->value)
+  new_data: Record<string, any>;
 }
 
 export interface TestRegressionResponse {

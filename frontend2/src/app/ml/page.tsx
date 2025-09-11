@@ -9,7 +9,7 @@ const modelTypes = [
     description: 'Predict continuous values. Regression models are used to predict a numerical value, such as the price of a house or the temperature.',
     link: '/ml/regression',
     icon: <FunctionSquare className="h-8 w-8 text-primary" />,
-    image: 'https://picsum.photos/seed/regression-chart/600/400',
+    image: '/images/ML.jpg',
     imageHint: 'line graph'
   },
   {
@@ -17,7 +17,7 @@ const modelTypes = [
     description: 'Predict a category. Classification models are used to assign a label to an input, like identifying spam or recognizing images.',
     link: '/ml/classification',
     icon: <Pilcrow className="h-8 w-8 text-primary" />,
-    image: 'https://picsum.photos/seed/classification-tree/600/400',
+    image: '/images/physimimg.jpg',
     imageHint: 'decision tree'
   },
   {
@@ -25,7 +25,7 @@ const modelTypes = [
     description: 'Unlock the power of neural networks for complex tasks like image recognition and natural language processing.',
     link: '/ml/deep-learning',
     icon: <BrainCircuit className="h-8 w-8 text-primary" />,
-    image: 'https://picsum.photos/seed/neural-network/600/400',
+    image: '/images/Ai_me.jpg',
     imageHint: 'neural network',
     disabled: false
   },
@@ -43,21 +43,21 @@ export default function MlPage() {
         {modelTypes.map((model) => (
           <Card key={model.name} className={`flex flex-col overflow-hidden transition-all duration-300 ${model.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-lg hover:shadow-primary/20'}`}>
             <div className="relative h-48 w-full">
-              <Image src={model.image} alt={model.name} layout="fill" objectFit="cover" data-ai-hint={model.imageHint} />
+              <Image src={model.image} alt={model.name} fill style={{ objectFit: 'cover' }} data-ai-hint={model.imageHint} />
             </div>
             <CardHeader className="flex-row gap-4 items-center">
-                {model.icon}
-                <CardTitle>{model.name}</CardTitle>
+              {model.icon}
+              <CardTitle>{model.name}</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow">
               <CardDescription>{model.description}</CardDescription>
             </CardContent>
-             <CardContent>
-                 <Link href={model.disabled ? '#' : model.link} className={`flex items-center text-sm font-semibold ${model.disabled ? 'text-muted-foreground' : 'text-primary hover:underline'}`}>
-                    {model.disabled ? 'Coming Soon' : `Go to ${model.name}`}
-                    {!model.disabled && <ArrowRight className="ml-2 h-4 w-4" />}
-                </Link>
-             </CardContent>
+            <CardContent>
+              <Link href={model.disabled ? '#' : model.link} className={`flex items-center text-sm font-semibold ${model.disabled ? 'text-muted-foreground' : 'text-primary hover:underline'}`}>
+                {model.disabled ? 'Coming Soon' : `Go to ${model.name}`}
+                {!model.disabled && <ArrowRight className="ml-2 h-4 w-4" />}
+              </Link>
+            </CardContent>
           </Card>
         ))}
       </div>

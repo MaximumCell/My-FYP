@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Rocket, TestTube, Lightbulb, Download, Loader2 } from 'lucide-react';
 
@@ -27,12 +27,35 @@ export default function MlModelTypePage() {
   const [testJson, setTestJson] = useState('[\n  {\n    "feature1": 0,\n    "feature2": 0\n  }\n]');
   const [testResults, setTestResults] = useState<any>(null);
   const [recommendation, setRecommendation] = useState<string>('');
+  const [epochs, setEpochs] = useState<number>(5);
+  const [batchSize, setBatchSize] = useState<number>(32);
+  const [configJson, setConfigJson] = useState<string>('');
   const [downloadModelName, setDownloadModelName] = useState('');
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: models, isLoading: modelsLoading } = useModels(modelType);
+  // Deep models are provided by backend at /ml/deep/models
+  const [models, setModels] = useState<string[]>([]);
+  const [modelsLoading, setModelsLoading] = useState<boolean>(false);
+
+  const fetchDeepModels = async () => {
+    try {
+      setModelsLoading(true);
+      const res = await api.get('/ml/deep/models');
+      // backend returns { models: [...] }
+      const data = res.data;
+      if (data && data.models) setModels(data.models);
+      else if (Array.isArray(res.data)) setModels(res.data);
+    } catch (e) {
+      console.error('Error fetching deep models', e);
+    } finally {
+      setModelsLoading(false);
+    }
+  };
+
+  // fetch on mount
+  useEffect(() => { fetchDeepModels(); }, []);
 
   const columnsMutation = useColumns();
   const trainMutation = useTrainModel(modelType);
@@ -53,44 +76,57 @@ export default function MlModelTypePage() {
       });
     }
   };
-  
+
   const handleTrain = () => {
     if (!file || !selectedModel) {
       toast({ variant: 'destructive', title: 'Missing file or model' });
       return;
     }
-    trainMutation.mutate(
-      { file, model: selectedModel, target_column: targetColumn || undefined },
-      {
-        onSuccess: (data) => {
-          setTrainResults(data);
-          toast({ title: 'Training successful!', description: data.message });
-        },
-        onError: (error: ApiError) => toast({ variant: 'destructive', title: 'Training failed', description: error.error }),
-      }
-    );
+    // Build FormData as backend expects file + form fields (epochs, batch_size, config)
+    const form = new FormData();
+    form.append('file', file);
+    form.append('model', selectedModel);
+    if (targetColumn) form.append('target_column', targetColumn);
+    form.append('epochs', String(epochs));
+    form.append('batch_size', String(batchSize));
+    if (configJson) form.append('config', configJson);
+
+    // Use backend deep train endpoint
+    api.post(`/ml/deep/train`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      .then((res) => {
+        setTrainResults(res.data);
+        toast({ title: 'Training successful!', description: res.data.message || 'Deep model trained' });
+        fetchDeepModels();
+      })
+      .catch((err) => {
+        const message = err?.response?.data?.error || err.message || 'Training failed';
+        toast({ variant: 'destructive', title: 'Training failed', description: message });
+      });
   };
-  
+
   const handleTest = () => {
     if (!selectedModel || !testJson) {
       toast({ variant: 'destructive', title: 'Missing model or test data' });
       return;
     }
     try {
-      const new_data = JSON.parse(testJson);
-      testMutation.mutate({ model: selectedModel, new_data },
-      {
-        onSuccess: (data) => {
-          setTestResults(data);
+      const input = JSON.parse(testJson);
+
+      // backend deep test endpoint
+      api.post(`/ml/deep/test`, { model: selectedModel, input })
+        .then((res) => {
+          setTestResults(res.data);
           toast({ title: 'Testing successful!' });
-        },
-        onError: (error: ApiError) => toast({ variant: 'destructive', title: 'Testing failed', description: error.error }),
-      })
+        })
+        .catch((err) => {
+          const message = err?.response?.data?.error || err.message || 'Testing failed';
+          toast({ variant: 'destructive', title: 'Testing failed', description: message });
+        });
     } catch (e) {
       toast({ variant: 'destructive', title: 'Invalid JSON', description: 'Please check your test data format.' });
     }
   };
-  
+
   const handleRecommend = () => {
     if (!file) {
       toast({ variant: 'destructive', title: 'Please upload a file first' });
@@ -121,9 +157,9 @@ export default function MlModelTypePage() {
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
-      toast({ title: `Downloading ${downloadModelName}`});
+      toast({ title: `Downloading ${downloadModelName}` });
     } catch (err) {
-       toast({ variant: 'destructive', title: 'Download failed', description: 'Model not found or server error.' });
+      toast({ variant: 'destructive', title: 'Download failed', description: 'Model not found or server error.' });
     }
   }
 
@@ -144,15 +180,15 @@ export default function MlModelTypePage() {
       </div>
     );
   };
-  
+
   const handleModelTypeChange = (type: ModelType) => {
     setModelType(type);
     setSelectedModel('');
     setTestResults(null);
     setTrainResults(null);
-    queryClient.invalidateQueries({ queryKey: ['models', type]});
+    queryClient.invalidateQueries({ queryKey: ['models', type] });
   }
-  
+
   const capitalizeFirstLetter = (string: string) => {
     if (!string) return '';
     return string.charAt(0).toUpperCase() + string.slice(1);
@@ -182,7 +218,7 @@ export default function MlModelTypePage() {
               {file && (
                 <div className="mt-4 space-y-4">
                   <p className="text-sm">File: <span className="font-medium text-primary">{file.name}</span></p>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="model-select">Model</Label>
@@ -199,7 +235,7 @@ export default function MlModelTypePage() {
                       <Label htmlFor="target-select">Target Column</Label>
                       <Select value={targetColumn} onValueChange={setTargetColumn} disabled={columnsMutation.isPending || columns.length === 0}>
                         <SelectTrigger id="target-select" disabled={columnsMutation.isPending || columns.length === 0}>
-                           <SelectValue placeholder={columnsMutation.isPending ? "Loading columns..." : "Select target"} />
+                          <SelectValue placeholder={columnsMutation.isPending ? "Loading columns..." : "Select target"} />
                         </SelectTrigger>
                         <SelectContent>
                           {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
@@ -207,10 +243,26 @@ export default function MlModelTypePage() {
                       </Select>
                     </div>
                   </div>
-                  <Button onClick={handleTrain} disabled={trainMutation.isPending}>
-                    {trainMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Train Model
-                  </Button>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+                    <div>
+                      <Label htmlFor="epochs">Epochs</Label>
+                      <Input id="epochs" type="number" min={1} value={epochs} onChange={(e) => setEpochs(Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <Label htmlFor="batch">Batch size</Label>
+                      <Input id="batch" type="number" min={1} value={batchSize} onChange={(e) => setBatchSize(Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <Label htmlFor="config">Config (JSON)</Label>
+                      <Textarea id="config" value={configJson} onChange={(e) => setConfigJson(e.target.value)} rows={3} />
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <Button onClick={handleTrain} disabled={trainMutation.isPending}>
+                      {trainMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Train Model
+                    </Button>
+                  </div>
                 </div>
               )}
               {trainResults && (
@@ -226,17 +278,17 @@ export default function MlModelTypePage() {
                 <CardDescription>Provide a model name and new data to get predictions.</CardDescription>
               </CardHeader>
               <div className="mt-4 space-y-4">
-                 <div>
-                      <Label htmlFor="model-select-test">Model</Label>
-                      <Select value={selectedModel} onValueChange={setSelectedModel}>
-                        <SelectTrigger id="model-select-test">
-                          <SelectValue placeholder={modelsLoading ? "Loading..." : "Select a model to test"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {models?.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                <div>
+                  <Label htmlFor="model-select-test">Model</Label>
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger id="model-select-test">
+                      <SelectValue placeholder={modelsLoading ? "Loading..." : "Select a model to test"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models?.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <Label htmlFor="test-data">New Data (JSON format)</Label>
                   <Textarea id="test-data" value={testJson} onChange={(e) => setTestJson(e.target.value)} rows={10} className="font-code" />
@@ -248,12 +300,12 @@ export default function MlModelTypePage() {
               </div>
               {testResults && (
                 <div className="mt-6">
-                   <h3 className="text-lg font-semibold">Test Results</h3>
-                   <Card className="mt-2">
-                     <CardContent className="p-4">
+                  <h3 className="text-lg font-semibold">Test Results</h3>
+                  <Card className="mt-2">
+                    <CardContent className="p-4">
                       <pre className="text-sm font-code bg-muted p-4 rounded-md overflow-x-auto">{JSON.stringify(testResults, null, 2)}</pre>
-                     </CardContent>
-                   </Card>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </TabsContent>

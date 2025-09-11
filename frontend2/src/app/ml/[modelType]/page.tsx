@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Rocket, TestTube, Lightbulb, Download, Loader2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
@@ -17,10 +17,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import FileUpload from '@/components/ml/file-upload';
 import api from '@/lib/api';
+import ModelSelector from '../components/ModelSelector';
+import HyperparamsEditor from '../components/HyperparamsEditor';
+import { suggestHyperparamsForModel } from '../utils/suggestHyperparams';
+import EvalSummary from '../components/EvalSummary';
 
 const validModelTypes: ModelType[] = ['regression', 'classification'];
 
-export default function MlModelTypePage({ params }: { params: { modelType: string }}) {
+export default function MlModelTypePage({ params }: { params: { modelType: string } }) {
   const modelTypeParam = params.modelType as ModelType;
 
   if (!validModelTypes.includes(modelTypeParam)) {
@@ -32,16 +36,49 @@ export default function MlModelTypePage({ params }: { params: { modelType: strin
   const [targetColumn, setTargetColumn] = useState<string>('');
   const [modelType, setModelType] = useState<ModelType>(modelTypeParam);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [testSize, setTestSize] = useState<number>(0.2);
+  const [scalingMethod, setScalingMethod] = useState<string>('standard');
+  const [hyperparamsPreset, setHyperparamsPreset] = useState<string>('default');
+  const [hyperparamsList, setHyperparamsList] = useState<Array<{ key: string; value: string }>>([]);
   const [trainResults, setTrainResults] = useState<TrainResponse | null>(null);
-  const [testJson, setTestJson] = useState('[\n  {\n    "feature1": 0,\n    "feature2": 0\n  }\n]');
+  const [testJson, setTestJson] = useState<string>(JSON.stringify({ feature1: 0, feature2: 0 }, null, 2));
   const [testResults, setTestResults] = useState<any>(null);
   const [recommendation, setRecommendation] = useState<string>('');
+  const [featureInputs, setFeatureInputs] = useState<Record<string, string>>({});
+  const [useJsonEditor, setUseJsonEditor] = useState<boolean>(false);
   const [downloadModelName, setDownloadModelName] = useState('');
-  
+
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const { data: models, isLoading: modelsLoading } = useModels(modelType);
+
+  // When models change, pre-select the first available model to ease testing
+  useEffect(() => {
+    if (!selectedModel && models && models.length > 0) {
+      setSelectedModel(models[0]);
+    }
+  }, [models]);
+
+  // Initialize feature inputs when columns are available
+  useEffect(() => {
+    if (columns && columns.length > 0) {
+      const init: Record<string, string> = {};
+      columns.forEach((c) => {
+        // Skip target column if set to avoid asking for it during test
+        if (c === targetColumn) return;
+        init[c] = '';
+      });
+      setFeatureInputs(init);
+    }
+  }, [columns, targetColumn]);
+
+  // Keep downloadModelName in sync with selectedModel when user hasn't manually changed it
+  useEffect(() => {
+    if (selectedModel) {
+      setDownloadModelName((prev) => (prev ? prev : selectedModel));
+    }
+  }, [selectedModel]);
 
   const columnsMutation = useColumns();
   const trainMutation = useTrainModel(modelType);
@@ -62,44 +99,125 @@ export default function MlModelTypePage({ params }: { params: { modelType: strin
       });
     }
   };
-  
+
   const handleTrain = () => {
     if (!file || !selectedModel) {
       toast({ variant: 'destructive', title: 'Missing file or model' });
       return;
     }
+    // For regression models, ensure a target column is selected
+    if (modelType === 'regression' && !targetColumn) {
+      toast({ variant: 'destructive', title: 'Please select a target column for regression' });
+      return;
+    }
+    // Build hyperparams from preset and custom key/value list
+    const buildValue = (v: string) => {
+      if (v === 'true') return true;
+      if (v === 'false') return false;
+      if (!isNaN(Number(v)) && v.trim() !== '') return Number(v);
+      return v;
+    };
+
+    const presetMap: Record<string, Record<string, any>> = {
+      default: {},
+      fast: { n_estimators: 10, max_depth: 5 },
+      accurate: { n_estimators: 200, max_depth: null }
+    };
+
+    let hyperparams: Record<string, any> = { ...(presetMap[hyperparamsPreset] || {}) };
+    for (const p of hyperparamsList) {
+      if (p.key.trim() === '') continue;
+      hyperparams[p.key] = buildValue(p.value);
+    }
+
     trainMutation.mutate(
-      { file, model: selectedModel, target_column: targetColumn || undefined },
+      { file, model: selectedModel, target_column: targetColumn || undefined, test_size: testSize, scaling_method: scalingMethod, hyperparams },
       {
         onSuccess: (data) => {
           setTrainResults(data);
+          // If backend returned a model path, extract a sensible model name for downloads
+          if (data && (data.model_path || data.model)) {
+            const path = data.model_path || data.model;
+            try {
+              const base = String(path).split('/').pop() || '';
+              // remove common suffixes used by backend
+              const name = base.replace(/(_classifier_pipeline|_pipeline)?\.pkl$/i, '');
+              setDownloadModelName(name);
+            } catch (e) {
+              // ignore
+            }
+          }
+          // refresh models list so UI shows newly trained models
+          queryClient.invalidateQueries({ queryKey: ['models', modelType] });
           toast({ title: 'Training successful!', description: data.message });
         },
         onError: (error: ApiError) => toast({ variant: 'destructive', title: 'Training failed', description: error.error }),
       }
     );
   };
-  
+
+  // Suggest sensible hyperparameters based on dataset size and feature count
+  const suggestHyperparams = async () => {
+    if (!file) {
+      toast({ variant: 'destructive', title: 'Upload a file first' });
+      return;
+    }
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(l => l.trim() !== '');
+      const rows = Math.max(0, lines.length - 1);
+      const nFeatures = columns.length || (lines[0] ? lines[0].split(',').length - 1 : 0);
+      const suggestions = suggestHyperparamsForModel({ selectedModel: selectedModel || '', rows, nFeatures });
+      const list = Object.entries(suggestions).map(([k, v]) => ({ key: k, value: String(v) }));
+      setHyperparamsPreset('recommended');
+      setHyperparamsList(list);
+      toast({ title: 'Recommended hyperparameters applied', description: 'You can tweak these values before training.' });
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Could not read file', description: 'Make sure the uploaded file is a valid CSV.' });
+    }
+  };
+
   const handleTest = () => {
     if (!selectedModel || !testJson) {
       toast({ variant: 'destructive', title: 'Missing model or test data' });
       return;
     }
     try {
-      const new_data = JSON.parse(testJson);
+      // If using the form editor (columns present and not using JSON), build the object from featureInputs
+      const parseValue = (v: string) => {
+        if (v === 'true') return true;
+        if (v === 'false') return false;
+        if (!isNaN(Number(v)) && v.trim() !== '') return Number(v);
+        return v;
+      };
+
+      let new_data: Record<string, any>;
+      if (columns.length > 0 && !useJsonEditor) {
+        new_data = {};
+        for (const [k, v] of Object.entries(featureInputs)) {
+          // Ignore empty fields
+          new_data[k] = v === '' ? null : parseValue(v);
+        }
+      } else {
+        // Allow users to provide raw JSON (object expected)
+        const parsed = JSON.parse(testJson);
+        // If user provided an array with a single object, accept it and use the first element
+        new_data = Array.isArray(parsed) ? parsed[0] : parsed;
+      }
+
       testMutation.mutate({ model: selectedModel, new_data },
-      {
-        onSuccess: (data) => {
-          setTestResults(data);
-          toast({ title: 'Testing successful!' });
-        },
-        onError: (error: ApiError) => toast({ variant: 'destructive', title: 'Testing failed', description: error.error }),
-      })
+        {
+          onSuccess: (data) => {
+            setTestResults(data);
+            toast({ title: 'Testing successful!' });
+          },
+          onError: (error: ApiError) => toast({ variant: 'destructive', title: 'Testing failed', description: error.error }),
+        })
     } catch (e) {
       toast({ variant: 'destructive', title: 'Invalid JSON', description: 'Please check your test data format.' });
     }
   };
-  
+
   const handleRecommend = () => {
     if (!file) {
       toast({ variant: 'destructive', title: 'Please upload a file first' });
@@ -108,6 +226,10 @@ export default function MlModelTypePage({ params }: { params: { modelType: strin
     recommendMutation.mutate(file, {
       onSuccess: (data) => {
         setRecommendation(data.recommended_model);
+        // if recommendation matches available models, pre-select it for convenience
+        if (data.recommended_model) {
+          setSelectedModel(data.recommended_model);
+        }
         toast({ title: 'Recommendation received!' });
       },
       onError: (error: ApiError) => toast({ variant: 'destructive', title: 'Recommendation failed', description: error.error }),
@@ -120,7 +242,8 @@ export default function MlModelTypePage({ params }: { params: { modelType: strin
       return;
     }
     try {
-      const response = await api.get(`/ml/download/${type}/${downloadModelName}`, {
+      const modelToDownload = downloadModelName || selectedModel;
+      const response = await api.get(`/ml/download/${type}/${modelToDownload}`, {
         responseType: 'blob',
       });
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -130,9 +253,9 @@ export default function MlModelTypePage({ params }: { params: { modelType: strin
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
-      toast({ title: `Downloading ${downloadModelName}`});
+      toast({ title: `Downloading ${downloadModelName}` });
     } catch (err) {
-       toast({ variant: 'destructive', title: 'Download failed', description: 'Model not found or server error.' });
+      toast({ variant: 'destructive', title: 'Download failed', description: 'Model not found or server error.' });
     }
   }
 
@@ -153,15 +276,61 @@ export default function MlModelTypePage({ params }: { params: { modelType: strin
       </div>
     );
   };
-  
+
+  // Produce a user-friendly evaluation from metrics returned by backend
+  const generateEvaluation = (results: TrainResponse, type: ModelType) => {
+    // Default
+    let percent = null as number | null;
+    let verdict = 'Insufficient metrics to evaluate model quality.';
+    let advice = 'Inspect raw metrics for more details.';
+
+    if (type === 'regression') {
+      // Prefer r2_score when available (higher is better, 1.0 is perfect)
+      const r2 = typeof results.r2_score === 'number' ? results.r2_score : null;
+      const mae = typeof results.mean_absolute_error === 'number' ? results.mean_absolute_error : null;
+      if (r2 !== null) {
+        percent = Math.max(0, Math.min(1, r2)) * 100;
+        if (r2 >= 0.9) { verdict = 'Excellent fit'; advice = 'Model explains most of the variance. Consider using for predictions.'; }
+        else if (r2 >= 0.75) { verdict = 'Good fit'; advice = 'Model performs well, but test on more data to confirm.'; }
+        else if (r2 >= 0.5) { verdict = 'Fair fit'; advice = 'Model has moderate predictive power; try feature engineering or different algorithms.'; }
+        else { verdict = 'Poor fit'; advice = 'Consider more data, different features, or alternative models.'; }
+      } else if (mae !== null) {
+        // Without r2, interpret MAE: lower is better — provide relative guidance (heuristic)
+        percent = null;
+        if (mae === 0) { verdict = 'Perfect predictions'; advice = 'MAE is 0 — unlikely on real data.'; }
+        else if (mae < 1) { verdict = 'Good (low error)'; advice = 'MAE is low; check units and deploy carefully.'; }
+        else if (mae < 10) { verdict = 'Acceptable'; advice = 'Error is moderate — consider improvements.'; }
+        else { verdict = 'High error'; advice = 'MAE is large relative to expected targets; try different models.'; }
+      }
+    } else if (type === 'classification') {
+      const acc = typeof results.accuracy === 'number' ? results.accuracy : null;
+      const f1 = typeof results.f1_score === 'number' ? results.f1_score : null;
+      if (acc !== null) {
+        percent = Math.max(0, Math.min(1, acc)) * 100;
+        if (acc >= 0.9) { verdict = 'Excellent classifier'; advice = 'High accuracy — good candidate for production.'; }
+        else if (acc >= 0.8) { verdict = 'Good classifier'; advice = 'Solid performance; validate on holdout data.'; }
+        else if (acc >= 0.7) { verdict = 'Fair classifier'; advice = 'Performance is okay; consider more data or tuning.'; }
+        else { verdict = 'Poor classifier'; advice = 'Consider feature engineering, balancing classes, or different models.'; }
+      } else if (f1 !== null) {
+        percent = Math.max(0, Math.min(1, f1)) * 100;
+        if (f1 >= 0.9) { verdict = 'Excellent (F1)'; advice = 'Strong precision/recall balance.'; }
+        else if (f1 >= 0.8) { verdict = 'Good (F1)'; advice = 'Acceptable balance of precision and recall.'; }
+        else if (f1 >= 0.7) { verdict = 'Fair (F1)'; advice = 'Could improve by tuning thresholds or model.'; }
+        else { verdict = 'Poor (F1)'; advice = 'Low F1; check class imbalance and feature quality.'; }
+      }
+    }
+
+    return { percent, verdict, advice };
+  };
+
   const handleModelTypeChange = (type: ModelType) => {
     setModelType(type);
     setSelectedModel('');
     setTestResults(null);
     setTrainResults(null);
-    queryClient.invalidateQueries({ queryKey: ['models', type]});
+    queryClient.invalidateQueries({ queryKey: ['models', type] });
   }
-  
+
   const capitalizeFirstLetter = (string: string) => {
     return string.charAt(0).toUpperCase() + string.slice(1);
   }
@@ -190,42 +359,64 @@ export default function MlModelTypePage({ params }: { params: { modelType: strin
               {file && (
                 <div className="mt-4 space-y-4">
                   <p className="text-sm">File: <span className="font-medium text-primary">{file.name}</span></p>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="model-select">Model</Label>
-                      <Select value={selectedModel} onValueChange={setSelectedModel}>
-                        <SelectTrigger id="model-select">
-                          <SelectValue placeholder={modelsLoading ? "Loading..." : "Select a model"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {models?.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
+                      <ModelSelector models={models} selectedModel={selectedModel} setSelectedModel={setSelectedModel} modelsLoading={modelsLoading} />
                     </div>
                     <div>
                       <Label htmlFor="target-select">Target Column</Label>
-                      <Select value={targetColumn} onValueChange={setTargetColumn} disabled={modelType === 'classification'}>
+                      <Select value={targetColumn} onValueChange={setTargetColumn}>
                         <SelectTrigger id="target-select" disabled={columnsMutation.isPending || columns.length === 0}>
-                           <SelectValue placeholder={columnsMutation.isPending ? "Loading columns..." : "Select target"} />
+                          <SelectValue placeholder={columnsMutation.isPending ? "Loading columns..." : "Select target"} />
                         </SelectTrigger>
                         <SelectContent>
                           {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                         </SelectContent>
                       </Select>
-                      {modelType === 'classification' && <p className="text-xs text-muted-foreground mt-1">Target column is not required for classification models.</p>}
+                      {!targetColumn && <p className="text-xs text-destructive mt-1">Please select a target column before training.</p>}
                     </div>
                   </div>
-                  <Button onClick={handleTrain} disabled={trainMutation.isPending}>
-                    {trainMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Train Model
-                  </Button>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <Label htmlFor="test-size">Test size (0-1)</Label>
+                      <Input id="test-size" type="number" step="0.05" min="0.01" max="0.9" value={testSize} onChange={(e) => setTestSize(Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <Label htmlFor="scaling-method">Scaling method</Label>
+                      <Select value={scalingMethod} onValueChange={setScalingMethod}>
+                        <SelectTrigger id="scaling-method"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="standard">standard</SelectItem>
+                          <SelectItem value="minmax">minmax</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1">
+                          <HyperparamsEditor preset={hyperparamsPreset} setPreset={setHyperparamsPreset} list={hyperparamsList} setList={setHyperparamsList} />
+                        </div>
+                        <div className="pt-2">
+                          <Button variant="outline" onClick={suggestHyperparams} disabled={!selectedModel}>Suggest</Button>
+                        </div>
+                      </div>
+                    </div>
+                    <Button onClick={handleTrain} disabled={trainMutation.isPending || !targetColumn}>
+                      {trainMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Train Model
+                    </Button>
+                  </div>
                 </div>
               )}
               {trainResults && (
                 <div className="mt-6">
                   <h3 className="text-lg font-semibold">Training Results</h3>
                   {renderMetrics(trainResults)}
+                  {(() => {
+                    const ev = generateEvaluation(trainResults, modelType);
+                    return <EvalSummary percent={ev.percent} verdict={ev.verdict} advice={ev.advice} />;
+                  })()}
                 </div>
               )}
             </TabsContent>
@@ -235,34 +426,114 @@ export default function MlModelTypePage({ params }: { params: { modelType: strin
                 <CardDescription>Provide a model name and new data to get predictions.</CardDescription>
               </CardHeader>
               <div className="mt-4 space-y-4">
-                 <div>
-                      <Label htmlFor="model-select-test">Model</Label>
-                      <Select value={selectedModel} onValueChange={setSelectedModel}>
-                        <SelectTrigger id="model-select-test">
-                          <SelectValue placeholder={modelsLoading ? "Loading..." : "Select a model to test"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {models?.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
                 <div>
-                  <Label htmlFor="test-data">New Data (JSON format)</Label>
-                  <Textarea id="test-data" value={testJson} onChange={(e) => setTestJson(e.target.value)} rows={10} className="font-code" />
+                  <Label htmlFor="model-select-test">Model</Label>
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger id="model-select-test">
+                      <SelectValue placeholder={modelsLoading ? "Loading..." : "Select a model to test"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {models?.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Button onClick={handleTest} disabled={testMutation.isPending}>
-                  {testMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Test Model
-                </Button>
+                <div>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="test-data">New Data</Label>
+                    <div className="flex items-center gap-2">
+                      <input id="use-json" type="checkbox" checked={useJsonEditor} onChange={(e) => setUseJsonEditor(e.target.checked)} />
+                      <Label htmlFor="use-json" className="text-sm">Use raw JSON</Label>
+                    </div>
+                  </div>
+
+                  {columns.length > 0 && !useJsonEditor ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                      {Object.keys(featureInputs).length === 0 && (
+                        <p className="text-sm text-muted-foreground">No feature inputs detected. Upload a CSV and select target to generate fields.</p>
+                      )}
+                      {Object.entries(featureInputs).map(([k, v]) => (
+                        <div key={k}>
+                          <Label className="text-xs">{k}</Label>
+                          <Input value={v} onChange={(e) => setFeatureInputs(prev => ({ ...prev, [k]: e.target.value }))} placeholder={`Enter value for ${k}`} />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-2">
+                      <Label htmlFor="test-data-json" className="text-xs">JSON Object (single object or array with one object)</Label>
+                      <Textarea id="test-data-json" value={testJson} onChange={(e) => setTestJson(e.target.value)} rows={10} className="font-code mt-2" />
+                      <p className="text-sm text-muted-foreground mt-1">Example: {JSON.stringify({ feature1: 0, feature2: 1 })}</p>
+                    </div>
+                  )}
+
+                  <Button onClick={handleTest} disabled={testMutation.isPending} className="mt-4">
+                    {testMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Test Model
+                  </Button>
+                </div>
               </div>
               {testResults && (
                 <div className="mt-6">
-                   <h3 className="text-lg font-semibold">Test Results</h3>
-                   <Card className="mt-2">
-                     <CardContent className="p-4">
-                      <pre className="text-sm font-code bg-muted p-4 rounded-md overflow-x-auto">{JSON.stringify(testResults, null, 2)}</pre>
-                     </CardContent>
-                   </Card>
+                  <h3 className="text-lg font-semibold">Test Results</h3>
+                  {/* Friendly rendering for regression and classification */}
+                  {modelType === 'regression' ? (
+                    <Card className="mt-2">
+                      <CardHeader>
+                        <CardTitle>Predicted Value</CardTitle>
+                        <CardDescription>Model: <span className="font-medium">{selectedModel}</span></CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {Array.isArray(testResults.predictions) ? (
+                          <div className="text-center">
+                            <p className="text-4xl font-bold">{typeof testResults.predictions[0] === 'number' ? testResults.predictions[0].toFixed(4) : String(testResults.predictions[0])}</p>
+                            {testResults.probabilities && <p className="text-sm text-muted-foreground mt-2">(additional info available)</p>}
+                          </div>
+                        ) : (
+                          <p className="text-lg">{String(testResults.predictions)}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-3">
+                      <Card className="mt-2">
+                        <CardHeader>
+                          <CardTitle>Predicted Class</CardTitle>
+                          <CardDescription>Model: <span className="font-medium">{selectedModel}</span></CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          {Array.isArray(testResults.predictions) ? (
+                            <div>
+                              <p className="text-2xl font-semibold">{Array.isArray(testResults.predictions) ? (testResults.class_names ? testResults.predictions[0] : testResults.predictions[0]) : String(testResults.predictions)}</p>
+                              {testResults.class_names && Array.isArray(testResults.predictions) && (
+                                <p className="text-sm text-muted-foreground mt-1">Label: <span className="font-medium">{testResults.class_names[testResults.predictions[0]] ?? testResults.predictions[0]}</span></p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-lg">{String(testResults.predictions)}</p>
+                          )}
+                        </CardContent>
+                      </Card>
+
+                      {testResults.probabilities && Array.isArray(testResults.probabilities) && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Probabilities</CardTitle>
+                            <CardDescription>Class probabilities for the provided input</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {testResults.probabilities[0].map((p: number, idx: number) => (
+                                <div key={idx} className="p-2 border rounded">
+                                  <div className="text-sm text-muted-foreground">{testResults.class_names ? testResults.class_names[idx] : `class ${idx}`}</div>
+                                  <div className="text-lg font-bold">{(p * 100).toFixed(2)}%</div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </TabsContent>
