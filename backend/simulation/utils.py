@@ -15,7 +15,11 @@ def ensure_plots_dir():
 def unique_path(prefix: str, ext: str) -> str:
     ensure_plots_dir()
     ts = int(time.time() * 1000)
-    filename = f"{prefix}_{ts}.{ext.lstrip('.')}"
+    # Ensure ext is not None and handle it properly
+    if ext is None:
+        ext = 'png'  # default extension
+    ext = str(ext).lstrip('.')
+    filename = f"{prefix}_{ts}.{ext}"
     return os.path.join(PLOTS_DIR, filename)
 
 
@@ -24,7 +28,23 @@ def read_csv_file(file_storage) -> Tuple[List[str], List[List[float]]]:
 
     file_storage may be a Flask FileStorage or a file-like object.
     """
-    stream = file_storage.stream if hasattr(file_storage, 'stream') else io.StringIO(file_storage.read().decode('utf-8'))
+    # Get a file-like stream. Flask's FileStorage provides a binary stream
+    # (bytes). csv.reader expects text (str) lines, so wrap binary streams
+    # with a TextIOWrapper to provide a text interface.
+    if hasattr(file_storage, 'stream'):
+        stream = file_storage.stream
+        # If the stream is binary (no 'encoding' attr), wrap it
+        if not getattr(stream, 'encoding', None):
+            stream = io.TextIOWrapper(stream, encoding='utf-8')
+            # ensure we start from the beginning
+            try:
+                stream.seek(0)
+            except Exception:
+                pass
+    else:
+        # file_storage may be raw bytes content
+        stream = io.StringIO(file_storage.read().decode('utf-8'))
+
     reader = csv.reader(stream)
     rows = list(reader)
     if not rows:

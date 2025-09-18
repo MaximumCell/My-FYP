@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Interactive Physics Simulations</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-family: Arial, sans-serif;
+        min-height: 100vh;
+      }
+
+      .header {
+        text-align: center;
+        color: white;
+        margin-bottom: 30px;
+      }
+
+      .header h1 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+        text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+      }
+
+      .header p {
+        font-size: 1.2em;
+        opacity: 0.9;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      #physics-simulation {
+        backdrop-filter: blur(10px);
+        background: rgba(248, 249, 250, 0.95) !important;
+        border: 2px solid rgba(0, 122, 204, 0.8) !important;
+        animation: fadeIn 0.5s ease-in;
+      }
+
+      input[type="range"] {
+        accent-color: #007acc;
+      }
+
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        transition: all 0.2s ease;
+      }
+
+      select {
+        border: 2px solid #007acc;
+        border-radius: 5px;
+      }
+
+      canvas {
+        box-shadow: inset 0 0 20px rgba(0, 122, 204, 0.3);
+      }
+
+      .info-panel {
+        background: rgba(255, 255, 255, 0.9);
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+        border: 1px solid #ddd;
+      }
+
+      .equation {
+        background: #f8f9fa;
+        padding: 10px;
+        border-left: 4px solid #007acc;
+        margin: 10px 0;
+        font-family: "Courier New", monospace;
+      }
+    </style>
+    <script src="./static/glow.js"></script>
+  </head>
+  <body>
+    <div class="header">
+      <h1>🧪 Interactive Physics Laboratory</h1>
+      <p>Explore and experiment with physics simulations in 3D</p>
+      <p style="font-size: 1em; opacity: 0.8">
+        Adjust parameters with sliders and see real-time changes in the
+        simulation
+      </p>
+    </div>
+
+    <!-- The simulation will be injected here by glow.js -->
+
+    <div class="info-panel" style="max-width: 1200px; margin: 20px auto">
+      <h3>📚 Educational Features:</h3>
+      <ul>
+        <li>
+          <strong>Electric Field:</strong> Visualize how point charges create
+          electric fields in 3D space
+        </li>
+        <li>
+          <strong>Pendulum:</strong> Explore the relationship between length,
+          gravity, and oscillation period
+        </li>
+        <li>
+          <strong>Magnetic Field:</strong> See how charged particles move in
+          magnetic fields
+        </li>
+        <li>
+          <strong>Interactive Controls:</strong> Real-time parameter adjustment
+          with instant visual feedback
+        </li>
+      </ul>
+
+      <div class="equation">
+        <strong>Electric Field:</strong> E = kQ/r² (Coulomb's Law)<br />
+        <strong>Pendulum Period:</strong> T = 2π√(L/g)<br />
+        <strong>Magnetic Force:</strong> F = q(v × B) (Lorentz Force)
+      </div>
+    </div>
+
+    <script>
+      console.log("Interactive Physics Laboratory initialized");
+
+      // Add some educational tooltips
+      setTimeout(() => {
+        const simulation = document.getElementById("physics-simulation");
+        if (simulation) {
+          // Add helpful tips
+          const tip = document.createElement("div");
+          tip.style.cssText = `
+                    position: fixed;
+                    bottom: 20px;
+                    right: 20px;
+                    background: rgba(0,122,204,0.9);
+                    color: white;
+                    padding: 10px 15px;
+                    border-radius: 5px;
+                    font-size: 14px;
+                    max-width: 250px;
+                    z-index: 1000;
+                `;
+          tip.innerHTML =
+            "💡 Tip: Use the controls on the left to modify simulation parameters and see physics in action!";
+          document.body.appendChild(tip);
+
+          // Auto-hide tip after 5 seconds
+          setTimeout(() => {
+            tip.style.opacity = "0";
+            tip.style.transition = "opacity 0.5s";
+          }, 5000);
+        }
+      }, 1000);
+    </script>
+  </body>
+</html>

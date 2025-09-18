@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Rocket, TestTube, Lightbulb, Download, Loader2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
@@ -24,8 +24,12 @@ import EvalSummary from '../components/EvalSummary';
 
 const validModelTypes: ModelType[] = ['regression', 'classification'];
 
-export default function MlModelTypePage({ params }: { params: { modelType: string } }) {
-  const modelTypeParam = params.modelType as ModelType;
+export default function MlModelTypePage({ params }: { params: Promise<{ modelType: string }> }) {
+  // `params` is a Promise in newer Next.js versions — unwrap it using React.use().
+  // Use a loose cast to avoid TypeScript complaints if React typings don't include `use`.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resolvedParams = (React as any).use ? (React as any).use(params) : undefined;
+  const modelTypeParam = (resolvedParams?.modelType ?? (params as unknown as { modelType: string }).modelType) as ModelType;
 
   if (!validModelTypes.includes(modelTypeParam)) {
     notFound();

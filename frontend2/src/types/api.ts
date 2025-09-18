@@ -51,13 +51,25 @@ export interface RecommendResponse {
 
 // /simulation/simulation
 export interface SimulationParams {
-  equation: string;
-  x_min: number;
-  x_max: number;
-  variables: Record<string, number>;
+  // mode can be 'equation', 'csv', '3d_surface', '3d_param', etc.
+  mode?: 'equation' | 'csv' | '3d_surface' | '3d_param' | string;
+  equation?: string;
+  x_min?: number;
+  x_max?: number;
+  y_min?: number;
+  y_max?: number;
+  resolution?: number;
+  variables?: Record<string, number>;
+  x_col?: string;
+  y_col?: string;
+  // allow extra/legacy keys
+  [key: string]: any;
 }
 export interface SimulationResponse {
   message: string;
-  plot_url: string;
+  // backend returns html_url/png_url (full URLs) and may also include legacy plot_url
+  html_url?: string;
+  png_url?: string | null;
+  plot_url?: string; // legacy
   equation: string;
 }

@@ -16,6 +16,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import FileUpload from '@/components/ml/file-upload';
 import api from '@/lib/api';
+import { Tooltip as RadixTooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { paramDescriptions } from '@/app/ml/utils/tooltips';
 
 export default function MlModelTypePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -245,11 +247,11 @@ export default function MlModelTypePage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
                     <div>
-                      <Label htmlFor="epochs">Epochs</Label>
+                      <Label htmlFor="epochs"><RadixTooltip><TooltipTrigger asChild><span>Epochs</span></TooltipTrigger><TooltipContent side="top">{paramDescriptions.epochs}</TooltipContent></RadixTooltip></Label>
                       <Input id="epochs" type="number" min={1} value={epochs} onChange={(e) => setEpochs(Number(e.target.value))} />
                     </div>
                     <div>
-                      <Label htmlFor="batch">Batch size</Label>
+                      <Label htmlFor="batch"><RadixTooltip><TooltipTrigger asChild><span>Batch size</span></TooltipTrigger><TooltipContent side="top">{paramDescriptions.batch_size}</TooltipContent></RadixTooltip></Label>
                       <Input id="batch" type="number" min={1} value={batchSize} onChange={(e) => setBatchSize(Number(e.target.value))} />
                     </div>
                     <div>

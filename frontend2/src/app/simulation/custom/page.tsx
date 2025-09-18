@@ -1,11 +1,11 @@
-
-'use client';
+"use client";
 
 import { useState } from 'react';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import Image from 'next/image';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useRunSimulation } from '@/hooks/use-simulation';
 import { useToast } from '@/hooks/use-toast';
 import type { ApiError } from '@/types/api';
-import { Loader2, PlusCircle, Trash2, Download } from 'lucide-react';
+import { Loader2, PlusCircle, Trash2, Download, ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 
 const predefinedEquations = [
@@ -76,11 +76,39 @@ export default function CustomSimulationPage() {
       return obj;
     }, {} as Record<string, number>);
 
-    simulationMutation.mutate({ ...data, variables: variablesObject }, {
+    // templates for predefined labels -> expressions (match backend PREDEFINED_EQUATIONS)
+    const PREDEFINED_EXPR: Record<string, string> = {
+      "Linear Motion (y = m*x + c)": "m*x + c",
+      "Quadratic Motion (y = a*x^2 + b*x + c)": "a*x**2 + b*x + c",
+      "SHM (y = A*sin(w*x + p))": "A*sin(w*x + p)",
+      "Simple Harmonic Motion": "A*sin(w*x + p)",
+    };
+
+    let exprToSend = '';
+    if (PREDEFINED_EXPR[data.equation]) {
+      exprToSend = PREDEFINED_EXPR[data.equation];
+    } else {
+      // assume user provided direct math expression
+      exprToSend = data.equation;
+    }
+
+    // substitute variable values (word-boundary replacement)
+    Object.entries(variablesObject).forEach(([k, v]) => {
+      try {
+        const re = new RegExp(`\\b${k}\\b`, 'g');
+        exprToSend = exprToSend.replace(re, String(v));
+      } catch (e) {
+        // ignore bad regex
+      }
+    });
+
+    // send the concrete expression to the backend for equation plotting
+    simulationMutation.mutate({ mode: 'equation', equation: exprToSend, x_min: data.x_min, x_max: data.x_max }, {
       onSuccess: (result) => {
+        const plotUrl = result.png_url || result.html_url || result.plot_url || '';
         setSimulationResult({
-          plotUrl: `${api.defaults.baseURL}${result.plot_url}`,
-          equation: result.equation,
+          plotUrl,
+          equation: result.equation || exprToSend,
         });
         toast({ title: 'Simulation complete!' });
       },
@@ -104,12 +132,16 @@ export default function CustomSimulationPage() {
 
   return (
     <div className="flex flex-col items-center">
+      <div className="mb-6 w-full max-w-5xl">
+        <Link href="/simulation" className="flex items-center text-sm text-primary hover:underline"><ArrowLeft className="mr-2 h-4 w-4" />Back to Simulations</Link>
+      </div>
+
       <div className="text-center mb-8">
         <h1 className="text-4xl font-headline font-bold">Custom Equation Simulator</h1>
         <p className="text-muted-foreground mt-2">Visualize any equation and see physics in action.</p>
       </div>
 
-      <div className="w-full grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -134,10 +166,10 @@ export default function CustomSimulationPage() {
                           {predefinedEquations.map(eq => (
                             <SelectItem key={eq.value} value={eq.value}>{eq.label}</SelectItem>
                           ))}
-                           <SelectItem value="custom">Custom Equation</SelectItem>
+                          <SelectItem value="custom">Custom Equation</SelectItem>
                         </SelectContent>
                       </Select>
-                      {form.watch('equation') === 'custom' && 
+                      {form.watch('equation') === 'custom' &&
                         <Input placeholder="e.g. 2*x + 1" className="mt-2" {...field} />
                       }
                       <FormMessage />
@@ -147,20 +179,20 @@ export default function CustomSimulationPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <FormField control={form.control} name="x_min" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Min X</FormLabel>
-                        <FormControl><Input type="number" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    <FormItem>
+                      <FormLabel>Min X</FormLabel>
+                      <FormControl><Input type="number" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                   />
                   <FormField control={form.control} name="x_max" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Max X</FormLabel>
-                        <FormControl><Input type="number" {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
+                    <FormItem>
+                      <FormLabel>Max X</FormLabel>
+                      <FormControl><Input type="number" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                   />
                 </div>
 
@@ -200,8 +232,19 @@ export default function CustomSimulationPage() {
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             ) : simulationResult ? (
               <div className="w-full space-y-4">
-                <div className="relative aspect-video w-full">
-                  <Image src={simulationResult.plotUrl} alt="Simulation Plot" layout="fill" objectFit="contain" unoptimized />
+                <div className="w-full">
+                  {/* If backend returned a PNG URL, show as image; otherwise if HTML URL provided, embed in iframe */}
+                  {simulationResult.plotUrl?.endsWith('.png') ? (
+                    <div className="relative aspect-video w-full">
+                      <Image src={simulationResult.plotUrl} alt="Simulation Plot" layout="fill" objectFit="contain" unoptimized />
+                    </div>
+                  ) : simulationResult.plotUrl ? (
+                    <div className="w-full h-[480px]">
+                      <iframe src={simulationResult.plotUrl} title="Simulation Plot" className="w-full h-full border" />
+                    </div>
+                  ) : (
+                    <p className="text-muted-foreground">No plot URL returned from backend.</p>
+                  )}
                 </div>
                 <p className="text-center font-code bg-background p-2 rounded">
                   Equation: {simulationResult.equation}

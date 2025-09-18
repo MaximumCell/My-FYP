@@ -31,8 +31,23 @@ def simulation_plot_csv():
     data = request.form.to_dict() if request.form else {}
     files = request.files or None
     host = request.host_url.rstrip('/')
-    result = run_simulation(data, files=files, host_url=host)
-    return jsonify(result)
+    
+    # If no file is present, return debug info so frontend can show what was received
+    if not files or 'file' not in files:
+        return jsonify({'error': 'CSV file required for csv plotting', 'received_files': list(request.files.keys()), 'received_form': data})
+    
+    try:
+        result = run_simulation(data, files=files, host_url=host)
+        
+        # If there's an error, return it as JSON
+        if 'error' in result:
+            return jsonify(result), 400
+        
+        # Return JSON with URLs instead of direct file download for interactive plots
+        return jsonify(result)
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @simulation_bp.route('/download/<path:filename>', methods=['GET'])

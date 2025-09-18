@@ -3,6 +3,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tooltip as RadixTooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { paramDescriptions } from '@/app/ml/utils/tooltips';
 
 export default function HyperparamsEditor({ preset, setPreset, list, setList }: { preset: string; setPreset: (v: string) => void; list: Array<{ key: string; value: string }>; setList: (s: Array<{ key: string; value: string }>) => void }) {
     return (
@@ -20,11 +22,18 @@ export default function HyperparamsEditor({ preset, setPreset, list, setList }: 
             <div className="space-y-2 mt-2">
                 {list.map((p, i) => (
                     <div key={i} className="flex gap-2">
-                        <Input value={p.key} placeholder="param" onChange={(e) => {
-                            const next = [...list];
-                            next[i] = { ...next[i], key: e.target.value };
-                            setList(next);
-                        }} />
+                        <RadixTooltip>
+                            <TooltipTrigger asChild>
+                                <Input value={p.key} placeholder="param" onChange={(e) => {
+                                    const next = [...list];
+                                    next[i] = { ...next[i], key: e.target.value };
+                                    setList(next);
+                                }} />
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                                {paramDescriptions[p.key] ?? 'Hyperparameter'}
+                            </TooltipContent>
+                        </RadixTooltip>
                         <Input value={p.value} placeholder="value" onChange={(e) => {
                             const next = [...list];
                             next[i] = { ...next[i], value: e.target.value };

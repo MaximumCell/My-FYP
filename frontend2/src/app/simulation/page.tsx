@@ -1,4 +1,4 @@
-
+"use client";
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowRight, Calculator, Zap, Spline } from 'lucide-react';
@@ -15,22 +15,40 @@ const simulationTypes = [
     disabled: false
   },
   {
-    name: 'Electric Field Simulator',
-    description: 'Visualize electric fields and potentials from various charge configurations. (Coming Soon)',
-    link: '#',
-    icon: <Zap className="h-8 w-8 text-primary" />,
-    image: 'https://picsum.photos/seed/electric-field/600/400',
-    imageHint: 'electric field',
-    disabled: true
+    name: '2D Plotter (Equation or CSV)',
+    description: 'Generate 2D plots either from equations or by uploading a CSV with x/y columns.',
+    link: '/simulation/plot2d',
+    icon: <Spline className="h-8 w-8 text-primary" />,
+    image: 'https://picsum.photos/seed/plot2d/600/400',
+    imageHint: '2d plot',
+    disabled: false
   },
   {
-    name: '2D Projectile Motion',
-    description: 'Simulate the trajectory of projectiles in a 2D space with customizable parameters like angle, velocity, and gravity. (Coming Soon)',
-    link: '#',
-    icon: <Spline className="h-8 w-8 text-primary" />,
-    image: 'https://picsum.photos/seed/projectile-motion/600/400',
-    imageHint: 'projectile motion',
-    disabled: true
+    name: '3D Plotter (Equation)',
+    description: 'Interactive 3D surface or parametric plots based on user-provided expressions.',
+    link: '/simulation/plot3d',
+    icon: <Zap className="h-8 w-8 text-primary" />,
+    image: 'https://picsum.photos/seed/plot3d/600/400',
+    imageHint: '3d plot',
+    disabled: false
+  },
+  {
+    name: 'VPython (GlowScript) Simulations',
+    description: 'Interactive VPython/GlowScript simulations (vector fields, orbits, presets).',
+    link: '/simulation/vpython',
+    icon: <Calculator className="h-8 w-8 text-primary" />,
+    image: 'https://picsum.photos/seed/vpython/600/400',
+    imageHint: 'vpython',
+    disabled: false
+  },
+  {
+    name: 'Pygame Particle Simulation',
+    description: 'Headless Pygame particle sims — returns frames and optional GIFs.',
+    link: '/simulation/pygame',
+    icon: <Zap className="h-8 w-8 text-primary" />,
+    image: 'https://picsum.photos/seed/pygame/600/400',
+    imageHint: 'particles',
+    disabled: false
   },
 ];
 
@@ -49,18 +67,18 @@ export default function SimulationPage() {
               <Image src={sim.image} alt={sim.name} layout="fill" objectFit="cover" data-ai-hint={sim.imageHint} />
             </div>
             <CardHeader className="flex-row gap-4 items-center">
-                {sim.icon}
-                <CardTitle>{sim.name}</CardTitle>
+              {sim.icon}
+              <CardTitle>{sim.name}</CardTitle>
             </CardHeader>
             <CardContent className="flex-grow">
               <CardDescription>{sim.description}</CardDescription>
             </CardContent>
-             <CardContent>
-                 <Link href={sim.disabled ? '#' : sim.link} className={`flex items-center text-sm font-semibold ${sim.disabled ? 'text-muted-foreground' : 'text-primary hover:underline'}`}>
-                    {sim.disabled ? 'Coming Soon' : 'Launch Simulator'}
-                    {!sim.disabled && <ArrowRight className="ml-2 h-4 w-4" />}
-                </Link>
-             </CardContent>
+            <CardContent>
+              <Link href={sim.disabled ? '#' : sim.link} className={`flex items-center text-sm font-semibold ${sim.disabled ? 'text-muted-foreground' : 'text-primary hover:underline'}`}>
+                {sim.disabled ? 'Coming Soon' : 'Launch Simulator'}
+                {!sim.disabled && <ArrowRight className="ml-2 h-4 w-4" />}
+              </Link>
+            </CardContent>
           </Card>
         ))}
       </div>
