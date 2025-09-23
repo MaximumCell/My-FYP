@@ -1,0 +1,16 @@
+age,income_monthly,visits_per_month,account_tenure_months,risk_level
+25,1200,1,6,Low
+34,2500,3,24,Low
+45,4800,5,60,Medium
+52,5200,2,72,Medium
+23,800,6,3,High
+31,3000,4,12,Low
+40,4000,2,36,Medium
+60,2000,1,120,High
+28,1500,8,9,High
+37,3500,3,48,Medium
+47,7000,2,96,Low
+55,6500,1,84,Low
+29,1600,5,8,High
+42,4200,4,40,Medium
+38,2900,2,30,Medium

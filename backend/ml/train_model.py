@@ -176,12 +176,22 @@ def test_model(model_name, new_data):
     if full_pipeline is None:
         return {"error": "Invalid model file: pipeline not found."}
 
-    # Prefer feature_names_out (already transformed names), else fallback to original feature names
-    expected_features = None
-    if feature_names_out:
-        expected_features = list(feature_names_out)
-    elif feature_names:
+    # Determine expected features.
+    # Prefer the original feature names captured during training (feature_names) because
+    # the pipeline's preprocessor may produce transformed output names like 'num__col' or 'cat__col_A'.
+    # Users will typically provide raw feature names (original), so validate against those first.
+    if feature_names:
         expected_features = list(feature_names)
+    elif feature_names_out:
+        # If only feature_names_out is available, check if the incoming data already uses those
+        # transformed names; otherwise fall back to using the keys provided by the user.
+        try:
+            if any(fn in new_data.keys() for fn in feature_names_out):
+                expected_features = list(feature_names_out)
+            else:
+                expected_features = list(new_data.keys())
+        except Exception:
+            expected_features = list(new_data.keys())
     else:
         # As a last resort, try to derive from the preprocessor (may fail for older sklearn)
         try:

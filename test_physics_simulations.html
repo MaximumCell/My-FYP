@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Physics Simulations Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+      }
+
+      .experiment-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+      }
+
+      .experiment-card {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .experiment-title {
+        color: #2c3e50;
+        margin-bottom: 10px;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 5px;
+      }
+
+      .status {
+        margin: 10px 0;
+        padding: 8px;
+        border-radius: 4px;
+        font-weight: bold;
+      }
+
+      .test-btn {
+        background: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px;
+      }
+
+      .test-btn:hover {
+        background: #2980b9;
+      }
+
+      .simulation-frame {
+        width: 100%;
+        height: 400px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🔬 Physics Simulations Test</h1>
+    <p>
+      Testing the modular physics simulations for syntax errors and VPython
+      loading.
+    </p>
+
+    <div class="experiment-grid">
+      <!-- Electric Field Test -->
+      <div class="experiment-card">
+        <h3 class="experiment-title">⚡ Electric Field Simulation</h3>
+        <div id="electric-status" class="status">Ready to test...</div>
+        <button class="test-btn" onclick="testElectricField()">
+          Test Electric Field
+        </button>
+        <iframe
+          id="electric-frame"
+          class="simulation-frame"
+          style="display: none"
+        ></iframe>
+      </div>
+
+      <!-- Magnetic Field Test -->
+      <div class="experiment-card">
+        <h3 class="experiment-title">🧲 Magnetic Field Simulation</h3>
+        <div id="magnetic-status" class="status">Ready to test...</div>
+        <button class="test-btn" onclick="testMagneticField()">
+          Test Magnetic Field
+        </button>
+        <iframe
+          id="magnetic-frame"
+          class="simulation-frame"
+          style="display: none"
+        ></iframe>
+      </div>
+
+      <!-- Gravity Field Test -->
+      <div class="experiment-card">
+        <h3 class="experiment-title">🌍 Gravity Field Simulation</h3>
+        <div id="gravity-status" class="status">Ready to test...</div>
+        <button class="test-btn" onclick="testGravityField()">
+          Test Gravity Field
+        </button>
+        <iframe
+          id="gravity-frame"
+          class="simulation-frame"
+          style="display: none"
+        ></iframe>
+      </div>
+    </div>
+
+    <script>
+      // Test electric field simulation
+      async function testElectricField() {
+        const statusDiv = document.getElementById("electric-status");
+        const frame = document.getElementById("electric-frame");
+
+        statusDiv.textContent = "Testing electric field simulation...";
+        statusDiv.style.background = "#fff3cd";
+        statusDiv.style.color = "#856404";
+
+        try {
+          const response = await fetch(
+            "http://localhost:5000/api/simulation/vpython",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "electric_field",
+                params: { E_strength: 2.0, grid: 8 },
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const html = await response.text();
+          frame.srcdoc = html;
+          frame.style.display = "block";
+
+          statusDiv.textContent =
+            "✅ Electric field simulation loaded successfully!";
+          statusDiv.style.background = "#d1edff";
+          statusDiv.style.color = "#0c5aa6";
+        } catch (error) {
+          statusDiv.textContent = `❌ Error: ${error.message}`;
+          statusDiv.style.background = "#f8d7da";
+          statusDiv.style.color = "#721c24";
+        }
+      }
+
+      // Test magnetic field simulation
+      async function testMagneticField() {
+        const statusDiv = document.getElementById("magnetic-status");
+        const frame = document.getElementById("magnetic-frame");
+
+        statusDiv.textContent = "Testing magnetic field simulation...";
+        statusDiv.style.background = "#fff3cd";
+        statusDiv.style.color = "#856404";
+
+        try {
+          const response = await fetch(
+            "http://localhost:5000/api/simulation/vpython",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "magnetic_field",
+                params: { B_strength: 1.5, particles: 3 },
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const html = await response.text();
+          frame.srcdoc = html;
+          frame.style.display = "block";
+
+          statusDiv.textContent =
+            "✅ Magnetic field simulation loaded successfully!";
+          statusDiv.style.background = "#d1edff";
+          statusDiv.style.color = "#0c5aa6";
+        } catch (error) {
+          statusDiv.textContent = `❌ Error: ${error.message}`;
+          statusDiv.style.background = "#f8d7da";
+          statusDiv.style.color = "#721c24";
+        }
+      }
+
+      // Test gravity field simulation
+      async function testGravityField() {
+        const statusDiv = document.getElementById("gravity-status");
+        const frame = document.getElementById("gravity-frame");
+
+        statusDiv.textContent = "Testing gravity field simulation...";
+        statusDiv.style.background = "#fff3cd";
+        statusDiv.style.color = "#856404";
+
+        try {
+          const response = await fetch(
+            "http://localhost:5000/api/simulation/vpython",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                action: "gravity_field",
+                params: { G_strength: 1.0, planets: 2 },
+              }),
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const html = await response.text();
+          frame.srcdoc = html;
+          frame.style.display = "block";
+
+          statusDiv.textContent =
+            "✅ Gravity field simulation loaded successfully!";
+          statusDiv.style.background = "#d1edff";
+          statusDiv.style.color = "#0c5aa6";
+        } catch (error) {
+          statusDiv.textContent = `❌ Error: ${error.message}`;
+          statusDiv.style.background = "#f8d7da";
+          statusDiv.style.color = "#721c24";
+        }
+      }
+    </script>
+  </body>
+</html>

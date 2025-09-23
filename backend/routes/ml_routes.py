@@ -1,5 +1,6 @@
 # ML Routes
 from flask import Blueprint, request, jsonify, send_file
+import json
 from ml.train_model import train_model, test_model, models as regression_models
 from ml.train_classifier import train_classifier, get_classifier_models, classification_models
 from ml.recommend_model import recommend_model
@@ -25,12 +26,26 @@ def train_regression():
     file = request.files['file']
     model_name = request.form.get('model')
     target_column = request.form.get('target_column', None)
+    # Optional training parameters
+    test_size_raw = request.form.get('test_size', None)
+    scaling_method = request.form.get('scaling_method', 'standard')
+    hyperparams_raw = request.form.get('hyperparams', None)
+
+    # parse numeric and json values
+    try:
+        test_size = float(test_size_raw) if test_size_raw is not None else 0.2
+    except Exception:
+        test_size = 0.2
+    try:
+        hyperparams = json.loads(hyperparams_raw) if hyperparams_raw else {}
+    except Exception:
+        hyperparams = {}
 
     if not model_name:
         return jsonify({"error": "Model name is required"}), 400
 
     try:
-        result = train_model(file, model_name, target_column)
+        result = train_model(file, model_name, target_column, test_size=test_size, hyperparams=hyperparams, scaling_method=scaling_method)
         if "error" in result:
             return jsonify(result), 400
         return jsonify(result)
@@ -73,12 +88,25 @@ def train_classification():
     file = request.files['file']
     model_name = request.form.get('model')
     target_column = request.form.get('target_column', None)
+    # Optional training parameters
+    test_size_raw = request.form.get('test_size', None)
+    scaling_method = request.form.get('scaling_method', 'standard')
+    hyperparams_raw = request.form.get('hyperparams', None)
+
+    try:
+        test_size = float(test_size_raw) if test_size_raw is not None else 0.2
+    except Exception:
+        test_size = 0.2
+    try:
+        hyperparams = json.loads(hyperparams_raw) if hyperparams_raw else {}
+    except Exception:
+        hyperparams = {}
 
     if not model_name:
         return jsonify({"error": "Model name is required"}), 400
 
     try:
-        result = train_classifier(file, model_name, target_column)
+        result = train_classifier(file, model_name, target_column, test_size=test_size, hyperparams=hyperparams, scaling_method=scaling_method)
         if "error" in result:
             return jsonify(result), 400
         return jsonify(result)

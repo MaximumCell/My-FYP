@@ -14,7 +14,7 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Register blueprints
 app.register_blueprint(ml_bp, url_prefix='/ml')
-app.register_blueprint(simulation_bp, url_prefix='/simulation')
+app.register_blueprint(simulation_bp, url_prefix='/simulation')  # Restore prefix for existing routes
 app.register_blueprint(ai_bp, url_prefix='/ai')
 
 if __name__ == '__main__':

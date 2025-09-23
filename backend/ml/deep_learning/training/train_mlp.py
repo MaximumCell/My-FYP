@@ -15,7 +15,7 @@ except Exception:
     pd = None
 
 
-def train_model(csv_file, target_column=None, epochs=10, batch_size=32, model_out_path=None):
+def train_model(csv_file, target_column=None, epochs=10, batch_size=32, config=None, model_out_path=None):
     """Train an MLP on a CSV dataset and save the trained model to disk.
 
     Returns dict with model_path and basic metrics or error.

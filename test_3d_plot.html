@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Test 3D Plot</title>
+  </head>
+  <body>
+    <h1>Test 3D Equation Plotting</h1>
+    <button onclick="test3DPlot()">Test 3D Equation Plot</button>
+    <button onclick="testCSVUpload()">Test CSV Upload</button>
+    <div id="result"></div>
+
+    <script>
+      async function test3DPlot() {
+        try {
+          const response = await fetch(
+            "http://localhost:5000/simulation/plot3d",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                mode: "equation",
+                equation: "sin(sqrt(x**2 + y**2))",
+                x_min: -5,
+                x_max: 5,
+                y_min: -5,
+                y_max: 5,
+                resolution: 30,
+              }),
+            }
+          );
+
+          const data = await response.json();
+          document.getElementById("result").innerHTML = `
+                    <h3>3D Equation Plot Result:</h3>
+                    <p>Status: ${response.status}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+        } catch (error) {
+          document.getElementById("result").innerHTML = `
+                    <h3>Error:</h3>
+                    <p>${error.message}</p>
+                `;
+        }
+      }
+
+      async function testCSVUpload() {
+        // Create a simple CSV file for testing
+        const csvContent = `x,y,z
+1,2,3
+2,3,4
+3,4,5
+4,5,6`;
+
+        const formData = new FormData();
+        const blob = new Blob([csvContent], { type: "text/csv" });
+        formData.append("file", blob, "test.csv");
+        formData.append("x_col", "x");
+        formData.append("y_col", "y");
+        formData.append("z_col", "z");
+
+        try {
+          const response = await fetch(
+            "http://localhost:5000/simulation/plot3d",
+            {
+              method: "POST",
+              body: formData,
+            }
+          );
+
+          const data = await response.json();
+          document.getElementById("result").innerHTML = `
+                    <h3>CSV Upload Result:</h3>
+                    <p>Status: ${response.status}</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+        } catch (error) {
+          document.getElementById("result").innerHTML = `
+                    <h3>Error:</h3>
+                    <p>${error.message}</p>
+                `;
+        }
+      }
+    </script>
+  </body>
+</html>

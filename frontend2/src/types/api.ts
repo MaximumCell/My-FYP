@@ -1,0 +1,75 @@
+// Shared types
+export type ModelType = 'regression' | 'classification' | 'deep-learning';
+export type ApiError = { error: string };
+
+// /ml/models/*
+export type ModelList = string[];
+
+// /ml/get_columns
+export type ColumnsResponse = { columns: string[] };
+
+// /ml/train/*
+export interface TrainParams {
+  file: File;
+  model: string;
+  target_column?: string;
+  test_size?: number;
+  scaling_method?: string;
+  hyperparams?: Record<string, any>;
+}
+export interface TrainResponse {
+  message: string;
+  model_path: string;
+  mean_squared_error?: number;
+  mean_absolute_error?: number;
+  r2_score?: number;
+  accuracy?: number;
+  [key: string]: any; // For any other metrics
+}
+
+// /ml/test/*
+export interface TestParams {
+  model: string;
+  // single example object (backend expects a dict of feature->value)
+  new_data: Record<string, any>;
+}
+
+export interface TestRegressionResponse {
+  predictions: number[];
+}
+
+export interface TestClassificationResponse {
+  predictions: (string | number)[];
+  probabilities: number[][];
+  class_names: (string | number)[];
+}
+
+// /ml/recommend
+export interface RecommendResponse {
+  recommended_model: string;
+}
+
+// /simulation/simulation
+export interface SimulationParams {
+  // mode can be 'equation', 'csv', 'parametric', etc.
+  mode?: 'equation' | 'csv' | 'parametric' | string;
+  equation?: string;
+  x_min?: number;
+  x_max?: number;
+  y_min?: number;
+  y_max?: number;
+  resolution?: number;
+  variables?: Record<string, number>;
+  x_col?: string;
+  y_col?: string;
+  // allow extra/legacy keys
+  [key: string]: any;
+}
+export interface SimulationResponse {
+  message: string;
+  // backend returns html_url/png_url (full URLs) and may also include legacy plot_url
+  html_url?: string;
+  png_url?: string | null;
+  plot_url?: string; // legacy
+  equation: string;
+}
