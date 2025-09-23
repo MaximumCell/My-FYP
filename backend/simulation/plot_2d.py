@@ -31,8 +31,29 @@ def safe_sympify(expr_str: str):
     return sp.sympify(expr_str, locals=ALLOWED_FUNCS)
 
 
-def plot_equation_2d(equation: str, x_min: float = -10, x_max: float = 10, resolution: int = 1000, **kwargs):
-    """Return dict with 'html_path' and 'png_path' of plotted equation z=f(x).
+def convert_marker_style(matplotlib_marker):
+    """Convert matplotlib marker symbols to Plotly symbols"""
+    marker_mapping = {
+        'o': 'circle',
+        's': 'square', 
+        '^': 'triangle-up',
+        'v': 'triangle-down',
+        '<': 'triangle-left',
+        '>': 'triangle-right',
+        'D': 'diamond',
+        'd': 'diamond-tall',
+        '*': 'star',
+        '+': 'cross',
+        'x': 'x',
+        '|': 'line-ns',
+        '_': 'line-ew',
+        'none': 'none'
+    }
+    return marker_mapping.get(matplotlib_marker, 'circle')  # default to circle if unknown
+
+def plot_equation_2d(equation: str, x_min: float, x_max: float, resolution: int = 200, **kwargs):
+    """
+    Plot a mathematical equation using sympy/numpy with advanced customization.
     
     Customization options:
     - width, height: plot dimensions in pixels
@@ -78,8 +99,9 @@ def plot_equation_2d(equation: str, x_min: float = -10, x_max: float = 10, resol
 
     # Plotly interactive
     fig = go.Figure()
-    marker_dict = {} if marker_style == 'none' else {'symbol': marker_style, 'size': marker_size}
-    mode = 'lines' if marker_style == 'none' else 'lines+markers'
+    plotly_marker_style = convert_marker_style(marker_style)
+    marker_dict = {} if plotly_marker_style == 'none' else {'symbol': plotly_marker_style, 'size': marker_size}
+    mode = 'lines' if plotly_marker_style == 'none' else 'lines+markers'
     
     fig.add_trace(go.Scatter(
         x=xs, y=ys, 
@@ -272,8 +294,9 @@ def plot_from_csv_columns(header, rows, x_col: str, y_col: str, **kwargs):
 
     # Plotly interactive
     fig = go.Figure()
-    marker_dict = {} if marker_style == 'none' else {'symbol': marker_style, 'size': marker_size}
-    mode = 'lines' if marker_style == 'none' else 'lines+markers'
+    plotly_marker_style = convert_marker_style(marker_style)
+    marker_dict = {} if plotly_marker_style == 'none' else {'symbol': plotly_marker_style, 'size': marker_size}
+    mode = 'lines' if plotly_marker_style == 'none' else 'lines+markers'
     
     fig.add_trace(go.Scatter(
         x=xs, y=ys, 

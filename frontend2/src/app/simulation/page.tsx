@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Calculator, Zap, Spline } from 'lucide-react';
+import { ArrowRight, Calculator, Zap, Spline, Atom, Move } from 'lucide-react';
 import Image from 'next/image';
 
 const simulationTypes = [
@@ -33,12 +33,21 @@ const simulationTypes = [
     disabled: false
   },
   {
-    name: 'VPython (GlowScript) Simulations',
-    description: 'Interactive VPython/GlowScript simulations (vector fields, orbits, presets).',
-    link: '/simulation/vpython',
-    icon: <Calculator className="h-8 w-8 text-primary" />,
-    image: 'https://picsum.photos/seed/vpython/600/400',
-    imageHint: 'vpython',
+    name: 'Matter.js Mechanical Physics',
+    description: 'Interactive mechanical physics simulations including pendulums, collisions, springs, and projectile motion.',
+    link: '/simulation/matter',
+    icon: <Move className="h-8 w-8 text-primary" />,
+    image: 'https://picsum.photos/seed/mechanical-physics/600/400',
+    imageHint: 'mechanical physics',
+    disabled: false
+  },
+  {
+    name: 'p5.js Electromagnetic Physics',
+    description: 'Electromagnetic and wave physics simulations with electric fields, magnetic fields, and wave motion.',
+    link: '/simulation/p5',
+    icon: <Atom className="h-8 w-8 text-primary" />,
+    image: 'https://picsum.photos/seed/electromagnetic/600/400',
+    imageHint: 'electromagnetic fields',
     disabled: false
   },
   {

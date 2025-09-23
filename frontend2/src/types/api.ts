@@ -51,8 +51,8 @@ export interface RecommendResponse {
 
 // /simulation/simulation
 export interface SimulationParams {
-  // mode can be 'equation', 'csv', '3d_surface', '3d_param', etc.
-  mode?: 'equation' | 'csv' | '3d_surface' | '3d_param' | string;
+  // mode can be 'equation', 'csv', 'parametric', etc.
+  mode?: 'equation' | 'csv' | 'parametric' | string;
   equation?: string;
   x_min?: number;
   x_max?: number;

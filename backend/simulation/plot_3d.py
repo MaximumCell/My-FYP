@@ -6,6 +6,27 @@ import plotly.io as pio
 from .utils import unique_path, ensure_plots_dir
 
 
+def convert_marker_style_3d(matplotlib_marker):
+    """Convert matplotlib marker symbols to Plotly 3D symbols"""
+    marker_mapping = {
+        'o': 'circle',
+        's': 'square', 
+        '^': 'triangle-up',
+        'v': 'triangle-down',
+        '<': 'triangle-left',
+        '>': 'triangle-right',
+        'D': 'diamond',
+        'd': 'diamond-tall',
+        '*': 'star',
+        '+': 'cross',
+        'x': 'x',
+        '|': 'line-ns',
+        '_': 'line-ew',
+        'none': 'circle'  # default for 3D
+    }
+    return marker_mapping.get(matplotlib_marker, 'circle')  # default to circle if unknown
+
+
 ALLOWED_FUNCS = {
     'sin': sp.sin, 'cos': sp.cos, 'tan': sp.tan,
     'asin': sp.asin, 'acos': sp.acos, 'atan': sp.atan,
@@ -219,6 +240,7 @@ def plot_from_csv_xyz(header, rows, x_col: str, y_col: str, z_col: str, **kwargs
     zs = np.array(zs_list, dtype=float)
 
     fig = go.Figure()
+    plot_type = "scatter"  # Default plot type
     
     # Try to detect grid data (unique x * unique y == npoints) and build a Surface
     ux = np.unique(xs)
@@ -272,7 +294,7 @@ def plot_from_csv_xyz(header, rows, x_col: str, y_col: str, z_col: str, **kwargs
             pass
         
         # Add scatter points
-        marker_symbol = marker_style if marker_style != 'none' else 'circle'
+        plotly_marker_style = convert_marker_style_3d(marker_style)
         fig.add_trace(go.Scatter3d(
             x=xs, y=ys, z=zs, 
             mode='markers', 
@@ -281,7 +303,7 @@ def plot_from_csv_xyz(header, rows, x_col: str, y_col: str, z_col: str, **kwargs
                 color=zs, 
                 colorscale=colormap, 
                 showscale=True,
-                symbol=marker_symbol
+                symbol=plotly_marker_style
             ),
             name='Data Points',
             hovertemplate=f'{xlabel}: %{{x:.4f}}<br>{ylabel}: %{{y:.4f}}<br>{zlabel}: %{{z:.4f}}<extra></extra>'

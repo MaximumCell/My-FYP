@@ -140,7 +140,7 @@ export default function Plot3DPage() {
         setLoading(true);
         try {
             const resp = await api.post('/simulation/plot3d', {
-                mode: '3d_surface',
+                mode: 'equation',
                 equation: data.equation,
                 x_min: data.x_min,
                 x_max: data.x_max,
@@ -273,7 +273,7 @@ export default function Plot3DPage() {
             formData.append('colormap', data.colormap || 'viridis');
 
             try {
-                const response = await fetch('http://localhost:5000/simulation/plot_csv', {
+                const response = await fetch('http://localhost:5000/simulation/plot3d', {
                     method: 'POST',
                     body: formData,
                 });
