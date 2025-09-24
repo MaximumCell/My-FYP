@@ -64,13 +64,68 @@ export default function PygamePage() {
                                 <FormField control={form.control} name="n" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Particles</FormLabel>
-                                        <FormControl><Input {...field} type="number" /></FormControl>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                type="number"
+                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 10)}
+                                                value={field.value || 10}
+                                            />
+                                        </FormControl>
                                     </FormItem>
                                 )} />
                                 <FormField control={form.control} name="steps" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Frames</FormLabel>
-                                        <FormControl><Input {...field} type="number" /></FormControl>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                type="number"
+                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 60)}
+                                                value={field.value || 60}
+                                            />
+                                        </FormControl>
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="width" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Width</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                type="number"
+                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 640)}
+                                                value={field.value || 640}
+                                                placeholder="640"
+                                            />
+                                        </FormControl>
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="height" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Height</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                type="number"
+                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 480)}
+                                                value={field.value || 480}
+                                                placeholder="480"
+                                            />
+                                        </FormControl>
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="radius" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Particle Radius</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                type="number"
+                                                onChange={(e) => field.onChange(parseInt(e.target.value) || 6)}
+                                                value={field.value || 6}
+                                            />
+                                        </FormControl>
                                     </FormItem>
                                 )} />
                                 <FormField control={form.control} name="save_gif" render={({ field }) => (
@@ -115,17 +170,6 @@ export default function PygamePage() {
                         )}
                     </CardContent>
                 </Card>
-
-                {lastResponse && (
-                    <Card className="lg:col-span-2">
-                        <CardHeader>
-                            <CardTitle>Server response (debug)</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <pre className="whitespace-pre-wrap text-sm">{JSON.stringify(lastResponse, null, 2)}</pre>
-                        </CardContent>
-                    </Card>
-                )}
             </div>
         </div>
     );

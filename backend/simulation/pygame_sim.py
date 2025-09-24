@@ -154,7 +154,7 @@ def run_particle_simulation(params: Dict[str, Any], host_url: str = '') -> Dict[
         try:
             imgs = [imageio.imread(p) for p in frame_paths]
             gif_path = unique_path(prefix, 'gif')
-            imageio.mimsave(gif_path, imgs, fps=24)
+            imageio.mimsave(gif_path, imgs, fps=24, loop=0)  # loop=0 means infinite loop
         except Exception as e:
             return {'error': f'Failed to write gif: {e}', 'frames': frame_paths}
 

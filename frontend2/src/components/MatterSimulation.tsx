@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Engine, Render, Runner, Bodies, Composite, Constraint, Mouse, MouseConstraint, Body } from 'matter-js'
+import { Engine, Render, Runner, Bodies, Composite, Constraint, Mouse, MouseConstraint, Body, Events } from 'matter-js'
 
 interface MatterSimulationProps {
     simulationType: string
@@ -21,22 +21,27 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
 
     // User customizable parameters
     const [userParams, setUserParams] = useState<any>({
-        // Pendulum parameters
+        // Pendulum parameters (matching backend expectations)
         length: 200,
-        mass: 10,
-        gravity: 1,
-        damping: 0.02,
-        // Collision parameters
-        ballCount: 5,
-        ballRadius: 20,
-        restitution: 0.8,
-        // Spring parameters
-        springStiffness: 0.02,
-        springRestLength: 100,
-        // Projectile parameters
+        mass: 1,
+        gravity: 0.8,
+        damping: 0.99,
         angle: 45,
+        // Collision parameters
+        ballCount: 8,
+        restitution: 0.8,
+        friction: 0.1,
+        airResistance: 0.01,
+        // Spring parameters
+        springConstant: 0.05,
+        springMass: 1.5,
+        initialDisplacement: 100,
+        // Projectile parameters
         velocity: 15,
-        targetDistance: 400
+        projectileAngle: 45,
+        projectileGravity: 0.5,
+        projectileAirResistance: 0.02,
+        launchHeight: 200
     })
 
     // Fetch simulation config
@@ -44,6 +49,29 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
         const fetchConfig = async () => {
             try {
                 setLoading(true)
+
+                // Map frontend parameter names to backend expectations
+                let mappedParams = { ...userParams }
+                if (simulationType === 'spring') {
+                    mappedParams = {
+                        ...userParams,
+                        mass: userParams.springMass, // Map springMass to mass for backend
+                    }
+                    delete mappedParams.springMass // Remove the frontend-only property
+                } else if (simulationType === 'projectile') {
+                    mappedParams = {
+                        ...userParams,
+                        angle: userParams.projectileAngle, // Map projectileAngle to angle
+                        gravity: userParams.projectileGravity, // Map projectileGravity to gravity
+                        airResistance: userParams.projectileAirResistance, // Map projectileAirResistance to airResistance
+                    }
+                    // Remove frontend-only properties
+                    delete mappedParams.projectileAngle
+                    delete mappedParams.projectileGravity
+                    delete mappedParams.projectileAirResistance
+                }
+
+                console.log('Fetching config for:', simulationType, 'with params:', mappedParams) // Debug log
                 const response = await fetch(`http://localhost:5000/simulation/api/simulation/matter`, {
                     method: 'POST',
                     headers: {
@@ -51,7 +79,7 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
                     },
                     body: JSON.stringify({
                         type: simulationType,
-                        parameters: userParams
+                        parameters: mappedParams
                     })
                 })
 
@@ -60,6 +88,7 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
                 }
 
                 const data = await response.json()
+                console.log('Received config:', data.simulation) // Debug log
                 setConfig(data.simulation)  // Use data.simulation instead of data
                 setError(null)
             } catch (err) {
@@ -129,6 +158,60 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
             }
         })
         Composite.add(engine.world, mouseConstraint)
+
+        // Add trail tracking for projectiles - draw directly on render canvas
+        if (config.type === 'projectile') {
+            // Track projectile position and draw trail directly on render canvas
+            const afterRender = () => {
+                const bodies = Composite.allBodies(engine.world)
+                const projectile = bodies.find((body: any) => body.isProjectile)
+
+                if (projectile && showTrails) {
+                    const trail = (projectile as any).trail
+
+                    // Add current position to trail (record every few frames for better spacing)
+                    const frameCount = (engine as any).frameCount || 0
+                    if (frameCount % 3 === 0) { // Record every 3rd frame for better dot spacing
+                        trail.push({
+                            x: projectile.position.x,
+                            y: projectile.position.y,
+                            timestamp: Date.now()
+                        })
+                    }
+
+                    // Limit trail length to prevent memory issues
+                    if (trail.length > 100) {
+                        trail.shift()
+                    }
+
+                    // Draw dotted trail directly on the render canvas
+                    const renderContext = render.canvas.getContext('2d')!
+                    if (trail.length > 0) {
+                        // Draw dotted trail - each dot represents a position in time
+                        trail.forEach((point: any, index: number) => {
+                            const alpha = Math.max(0.4, (index / trail.length)) // Fade older dots
+                            const dotSize = Math.max(1.5, 3 * (index / trail.length)) // Larger dots for recent positions
+
+                            renderContext.fillStyle = `rgba(33, 150, 243, ${alpha})`
+                            renderContext.beginPath()
+                            renderContext.arc(point.x, point.y, dotSize, 0, Math.PI * 2)
+                            renderContext.fill()
+
+                            // Add white outline for better visibility
+                            renderContext.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.3})`
+                            renderContext.lineWidth = 1
+                            renderContext.stroke()
+                        })
+                    }
+
+                    // Increment frame counter
+                    ; (engine as any).frameCount = frameCount + 1
+                }
+            }
+
+            // Add the event listener for trail tracking - use afterRender to draw on canvas
+            Events.on(render, 'afterRender', afterRender)
+        }
 
         // Start the engine and renderer
         const runner = Runner.create()
@@ -239,39 +322,81 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
     const createSpringSimulation = (engine: Engine, config: any) => {
         const { spring, mass: massConfig, world } = config
 
-        // Create anchor
-        const anchor = Bodies.circle(spring.anchorX, spring.anchorY, 5, {
+        // Create anchor point (bigger and more visible)
+        const anchor = Bodies.circle(spring.anchorX, spring.anchorY, 8, {
             isStatic: true,
-            render: { fillStyle: '#ffffff' }
+            render: {
+                fillStyle: '#ffffff',
+                strokeStyle: '#cccccc',
+                lineWidth: 2
+            }
         })
 
-        // Create mass
+        // Create mass (with better visual feedback)
         const mass = Bodies.circle(
             massConfig.initialX,
             massConfig.initialY,
             massConfig.radius,
             {
                 mass: massConfig.mass,
-                render: { fillStyle: '#FF5722' },
-                frictionAir: 1 - spring.damping
+                render: {
+                    fillStyle: '#FF5722',
+                    strokeStyle: '#D32F2F',
+                    lineWidth: 2
+                },
+                frictionAir: 0.001, // Very low air resistance for better oscillation
+                restitution: 0.8 // Some bounciness
             }
         )
 
-        // Create spring constraint
+        // Create spring constraint with enhanced visuals
         const springConstraint = Constraint.create({
             bodyA: anchor,
             bodyB: mass,
             length: spring.restLength,
-            stiffness: spring.stiffness,
-            damping: spring.damping,
+            stiffness: spring.stiffness * 5, // Much higher stiffness for visible oscillation
+            damping: 0.001, // Even lower damping
             render: {
                 type: 'line',
                 strokeStyle: '#4CAF50',
-                lineWidth: 3
+                lineWidth: 4,
+                visible: true
             }
         })
 
-        Composite.add(engine.world, [anchor, mass, springConstraint])
+        // Create equilibrium line (visual reference)
+        const equilibriumY = spring.anchorY + spring.restLength
+        const equilibriumLine = Bodies.rectangle(
+            spring.anchorX, equilibriumY, 100, 2,
+            {
+                isStatic: true,
+                render: {
+                    fillStyle: '#FFC107',
+                    strokeStyle: '#FF8F00',
+                    lineWidth: 1
+                },
+                isSensor: true // Doesn't interfere with physics
+            }
+        )
+
+        // Add initial impulse to start vertical oscillation
+        setTimeout(() => {
+            if (mass) {
+                Body.applyForce(mass, mass.position, { x: 0, y: 0.05 }) // Only vertical force for spring motion
+            }
+        }, 100)
+
+        // Add initial strong impulse to start oscillation immediately
+        setTimeout(() => {
+            if (mass) {
+                Body.applyForce(mass, mass.position, { x: 0, y: 0.1 }) // Strong vertical force
+            }
+        }, 50) // Very quick start
+
+            // Store mass reference for external force application
+            ; (mass as any).isSpringMass = true
+
+        Composite.add(engine.world, [anchor, mass, springConstraint, equilibriumLine])
     }
 
     const createProjectileSimulation = (engine: Engine, config: any) => {
@@ -283,19 +408,30 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
             { isStatic: true, render: { fillStyle: '#8BC34A' } }
         )
 
-        // Create launcher
+        // Create launcher (yellow bar - adjustable height)
         const launcher = Bodies.rectangle(
-            projectile.launchX, projectile.launchY, 30, 10,
-            { isStatic: true, render: { fillStyle: '#FFC107' } }
+            projectile.launchX, projectile.launchY, 40, 8,
+            {
+                isStatic: true,
+                render: {
+                    fillStyle: '#FFC107',
+                    strokeStyle: '#FF8F00',
+                    lineWidth: 2
+                }
+            }
         )
 
-        // Create target
+        // Create target with enhanced visuals
         const targetBody = Bodies.circle(target.x, target.y, target.radius, {
             isStatic: true,
-            render: { fillStyle: '#F44336' }
+            render: {
+                fillStyle: '#F44336',
+                strokeStyle: '#D32F2F',
+                lineWidth: 2
+            }
         })
 
-        // Create projectile
+        // Create projectile with trail tracking
         const velocityX = projectile.velocity * Math.cos(projectile.angle)
         const velocityY = -projectile.velocity * Math.sin(projectile.angle)
 
@@ -304,9 +440,17 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
             {
                 mass: projectile.mass,
                 restitution: projectile.restitution,
-                render: { fillStyle: '#2196F3' }
+                render: {
+                    fillStyle: '#2196F3',
+                    strokeStyle: '#1976D2',
+                    lineWidth: 2
+                }
             }
         )
+
+            // Initialize trail array for the projectile
+            ; (projectileBody as any).trail = []
+            ; (projectileBody as any).isProjectile = true
 
         // Set initial velocity
         engine.world.gravity.y = world.gravity
@@ -331,8 +475,41 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
         window.location.reload()
     }
 
+    const applySpringForce = () => {
+        if (!engineRef.current) return
+
+        // Find the spring mass body
+        const bodies = Composite.allBodies(engineRef.current.world)
+        const springMass = bodies.find((body: any) => body.isSpringMass)
+
+        if (springMass) {
+            // Apply only vertical force for proper spring oscillation (no horizontal swing)
+            const forceY = (Math.random() - 0.5) * 0.08 // Random vertical force between -0.04 and +0.04
+
+            Body.applyForce(springMass, springMass.position, {
+                x: 0, // No horizontal force - keep it vertical
+                y: forceY
+            })
+
+            console.log(`Applied vertical spring force: y=${forceY.toFixed(3)}`)
+        }
+    }
+
+    const resetTrail = () => {
+        if (!engineRef.current) return
+
+        // Find the projectile body and clear its trail
+        const bodies = Composite.allBodies(engineRef.current.world)
+        const projectile = bodies.find((body: any) => body.isProjectile)
+
+        if (projectile) {
+            ; (projectile as any).trail = []
+            console.log('Trail reset for projectile')
+        }
+    }
+
     const updateParameter = (paramName: string, value: number) => {
-        setUserParams(prev => ({
+        setUserParams((prev: any) => ({
             ...prev,
             [paramName]: value
         }))
@@ -343,27 +520,32 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
             case 'pendulum':
                 return [
                     { name: 'length', label: 'Length (px)', value: userParams.length, min: 50, max: 400, step: 10 },
-                    { name: 'mass', label: 'Mass', value: userParams.mass, min: 1, max: 50, step: 1 },
-                    { name: 'gravity', label: 'Gravity', value: userParams.gravity, min: 0.1, max: 3, step: 0.1 },
-                    { name: 'damping', label: 'Damping', value: userParams.damping, min: 0, max: 0.1, step: 0.005 }
+                    { name: 'mass', label: 'Mass', value: userParams.mass, min: 0.5, max: 3, step: 0.1 },
+                    { name: 'gravity', label: 'Gravity', value: userParams.gravity, min: 0.1, max: 2, step: 0.1 },
+                    { name: 'damping', label: 'Damping', value: userParams.damping, min: 0.95, max: 1, step: 0.005 },
+                    { name: 'angle', label: 'Start Angle (°)', value: userParams.angle, min: 5, max: 85, step: 5 }
                 ]
             case 'collision':
                 return [
-                    { name: 'ballCount', label: 'Ball Count', value: userParams.ballCount, min: 2, max: 10, step: 1 },
-                    { name: 'ballRadius', label: 'Ball Radius', value: userParams.ballRadius, min: 10, max: 50, step: 5 },
-                    { name: 'restitution', label: 'Bounciness', value: userParams.restitution, min: 0, max: 1, step: 0.1 }
+                    { name: 'ballCount', label: 'Ball Count', value: userParams.ballCount, min: 3, max: 15, step: 1 },
+                    { name: 'restitution', label: 'Bounciness', value: userParams.restitution, min: 0.1, max: 1, step: 0.1 },
+                    { name: 'friction', label: 'Friction', value: userParams.friction, min: 0, max: 0.5, step: 0.05 },
+                    { name: 'airResistance', label: 'Air Resistance', value: userParams.airResistance, min: 0, max: 0.05, step: 0.005 }
                 ]
             case 'spring':
                 return [
-                    { name: 'springStiffness', label: 'Stiffness', value: userParams.springStiffness, min: 0.001, max: 0.1, step: 0.005 },
-                    { name: 'springRestLength', label: 'Rest Length', value: userParams.springRestLength, min: 50, max: 200, step: 10 },
-                    { name: 'mass', label: 'Mass', value: userParams.mass, min: 1, max: 50, step: 1 }
+                    { name: 'springConstant', label: 'Spring Constant', value: userParams.springConstant, min: 0.01, max: 0.1, step: 0.005 },
+                    { name: 'springMass', label: 'Mass', value: userParams.springMass, min: 0.5, max: 3, step: 0.1 },
+                    { name: 'damping', label: 'Damping', value: userParams.damping, min: 0.9, max: 1, step: 0.005 },
+                    { name: 'initialDisplacement', label: 'Initial Displacement', value: userParams.initialDisplacement, min: 50, max: 200, step: 10 }
                 ]
             case 'projectile':
                 return [
-                    { name: 'angle', label: 'Launch Angle (°)', value: userParams.angle, min: 0, max: 90, step: 5 },
-                    { name: 'velocity', label: 'Initial Velocity', value: userParams.velocity, min: 5, max: 30, step: 1 },
-                    { name: 'targetDistance', label: 'Target Distance', value: userParams.targetDistance, min: 200, max: 600, step: 50 }
+                    { name: 'projectileAngle', label: 'Launch Angle (°)', value: userParams.projectileAngle, min: 15, max: 75, step: 5 },
+                    { name: 'velocity', label: 'Initial Velocity', value: userParams.velocity, min: 5, max: 25, step: 1 },
+                    { name: 'projectileGravity', label: 'Gravity', value: userParams.projectileGravity, min: 0.1, max: 1, step: 0.1 },
+                    { name: 'projectileAirResistance', label: 'Air Resistance', value: userParams.projectileAirResistance, min: 0, max: 0.05, step: 0.005 },
+                    { name: 'launchHeight', label: 'Launch Height', value: userParams.launchHeight, min: 100, max: 400, step: 25 }
                 ]
             default:
                 return []
@@ -472,6 +654,26 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
                         >
                             {showTrails ? '👁 Hide Trails' : '👁 Show Trails'}
                         </button>
+
+                        {/* Spring Force Button - only show for spring simulation */}
+                        {simulationType === 'spring' && (
+                            <button
+                                onClick={applySpringForce}
+                                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded text-sm font-medium"
+                            >
+                                ⚡ Apply Force
+                            </button>
+                        )}
+
+                        {/* Reset Trail Button - only show for projectile simulation */}
+                        {simulationType === 'projectile' && (
+                            <button
+                                onClick={resetTrail}
+                                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded text-sm font-medium"
+                            >
+                                🎯 Reset Trail
+                            </button>
+                        )}
                     </div>
 
                     {/* Parameter Controls */}

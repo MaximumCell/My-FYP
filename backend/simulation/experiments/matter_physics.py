@@ -125,7 +125,9 @@ def generate_spring_config(params=None):
                 'width': 800,
                 'height': 600,
                 'showEquilibrium': True,
-                'showForces': params.get('showForces', False)
+                'showForces': params.get('showForces', True),
+                'showVelocityVectors': True,
+                'enableInteraction': True
             }
         },
         'controls': {
@@ -133,6 +135,26 @@ def generate_spring_config(params=None):
             'mass': {'min': 0.5, 'max': 3, 'value': params.get('mass', 1.5)},
             'damping': {'min': 0.9, 'max': 1, 'value': params.get('damping', 0.98)},
             'displacement': {'min': 50, 'max': 200, 'value': params.get('initialDisplacement', 100)}
+        },
+        'metadata': {
+            'title': 'Interactive Spring-Mass System',
+            'description': 'Observe simple harmonic motion and Hooke\'s law in action. Drag the mass or click "Apply Force" to see oscillation.',
+            'physics_concepts': [
+                'Hooke\'s Law (F = -kx)',
+                'Simple Harmonic Motion',
+                'Elastic Potential Energy',
+                'Damped Oscillations',
+                'Conservation of Energy',
+                'Resonance'
+            ],
+            'educational_notes': 'See how spring force is proportional to displacement. Try different masses and spring constants to observe frequency changes.',
+            'instructions': [
+                'Drag the orange mass to displace it',
+                'Click "Apply Force" to add energy to the system',
+                'Adjust spring constant to change oscillation frequency',
+                'Increase damping to see energy dissipation',
+                'Change mass to observe inertial effects'
+            ]
         }
     }
 
@@ -143,7 +165,8 @@ def generate_projectile_config(params=None):
             'velocity': 15,
             'angle': 45,
             'gravity': 0.5,
-            'airResistance': 0.02
+            'airResistance': 0.02,
+            'launchHeight': 500
         }
     
     return {
@@ -153,7 +176,7 @@ def generate_projectile_config(params=None):
                 'radius': 8,
                 'mass': 1,
                 'launchX': 50,
-                'launchY': 500,
+                'launchY': 700 - params.get('launchHeight', 200),  # Invert height: higher param = higher position (lower Y)
                 'velocity': params.get('velocity', 15),
                 'angle': params.get('angle', 45) * 3.14159 / 180,  # Convert to radians
                 'restitution': 0.7
@@ -172,14 +195,36 @@ def generate_projectile_config(params=None):
                 'width': 800,
                 'height': 600,
                 'showTrajectory': params.get('showTrajectory', True),
-                'showVelocityVector': params.get('showVector', True)
+                'showVelocityVector': params.get('showVector', True),
+                'showTrails': True
             }
         },
         'controls': {
             'velocity': {'min': 5, 'max': 25, 'value': params.get('velocity', 15)},
             'angle': {'min': 15, 'max': 75, 'value': params.get('angle', 45)},
             'gravity': {'min': 0.1, 'max': 1, 'value': params.get('gravity', 0.5)},
-            'airResistance': {'min': 0, 'max': 0.05, 'value': params.get('airResistance', 0.02)}
+            'airResistance': {'min': 0, 'max': 0.05, 'value': params.get('airResistance', 0.02)},
+            'launchHeight': {'min': 100, 'max': 400, 'value': params.get('launchHeight', 200)}
+        },
+        'metadata': {
+            'title': 'Interactive Projectile Motion',
+            'description': 'Explore projectile motion with customizable launch parameters and trajectory visualization.',
+            'physics_concepts': [
+                'Projectile Motion',
+                'Kinematic Equations',
+                'Gravity Effects',
+                'Air Resistance',
+                'Trajectory Analysis',
+                'Launch Angle Optimization'
+            ],
+            'educational_notes': 'Observe how launch angle, velocity, height, and gravity affect the projectile\'s trajectory.',
+            'instructions': [
+                'Adjust launch velocity to change range',
+                'Change launch angle to optimize trajectory', 
+                'Modify launch height to see elevation effects',
+                'Observe trail to analyze projectile path',
+                'Try different gravity values to see planetary effects'
+            ]
         }
     }
 

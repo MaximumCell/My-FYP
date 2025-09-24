@@ -22,7 +22,7 @@ def matter_simulation():
     try:
         data = request.get_json()
         simulation_type = data.get('type', 'pendulum')
-        params = data.get('params', {})
+        params = data.get('parameters', data.get('params', {}))  # Accept both 'parameters' and 'params'
         
         # Validate simulation type
         valid_types = ['pendulum', 'collision', 'spring', 'projectile']
@@ -424,8 +424,8 @@ def simulation_pygame():
     try:
         data = request.get_json()
         params = {
-            'n': data.get('num_particles', 50),
-            'steps': int(data.get('simulation_time', 5.0) * 24),  # Convert time to frames (24 fps)
+            'n': data.get('n', 50),  # Use 'n' directly as frontend sends it
+            'steps': data.get('steps', 120),  # Use 'steps' directly as frontend sends it
             'width': data.get('width', 800),
             'height': data.get('height', 600),
             'radius': data.get('radius', 5),
@@ -433,6 +433,22 @@ def simulation_pygame():
         }
         
         result = run_particle_simulation(params)
+        
+        # Convert file paths to URLs so frontend can access them
+        base_url = request.host_url.rstrip('/')
+        if 'frames' in result:
+            frame_urls = []
+            for frame_path in result['frames']:
+                if frame_path:  # Skip None or empty paths
+                    frame_filename = os.path.basename(frame_path)
+                    frame_url = f"{base_url}/simulation/download/{frame_filename}"
+                    frame_urls.append(frame_url)
+            result['frames'] = frame_urls
+            
+        if 'gif' in result and result['gif']:
+            gif_filename = os.path.basename(result['gif'])
+            result['gif_url'] = f"{base_url}/simulation/download/{gif_filename}"
+        
         return jsonify(result)
         
     except Exception as e:
