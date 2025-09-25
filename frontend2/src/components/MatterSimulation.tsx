@@ -460,19 +460,41 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
     }
 
     const togglePause = () => {
-        if (!runnerRef.current) return
+        if (!runnerRef.current || !engineRef.current) return
 
         if (isPaused) {
-            Runner.start(runnerRef.current, engineRef.current!)
+            Runner.run(runnerRef.current, engineRef.current) // Use Runner.run to resume
         } else {
-            Runner.stop(runnerRef.current)
+            Runner.stop(runnerRef.current) // Use Runner.stop to pause
         }
         setIsPaused(!isPaused)
     }
 
     const resetSimulation = () => {
-        // Trigger re-render by forcing config update
-        window.location.reload()
+        if (!engineRef.current || !renderRef.current || !runnerRef.current) return
+
+        // Stop the current simulation
+        Runner.stop(runnerRef.current)
+        Render.stop(renderRef.current)
+
+        // Clear the world
+        Composite.clear(engineRef.current.world, false)
+        Engine.clear(engineRef.current)
+
+        // Remove the canvas
+        if (renderRef.current.canvas) {
+            renderRef.current.canvas.remove()
+        }
+
+        // Reset pause state
+        setIsPaused(false)
+
+        // Force re-render by updating a key state
+        setConfig(prevConfig => ({
+            ...prevConfig!,
+            // Add a timestamp to force re-render
+            resetTimestamp: Date.now()
+        }))
     }
 
     const applySpringForce = () => {

@@ -54,7 +54,8 @@ def p5_simulation():
     try:
         data = request.get_json()
         simulation_type = data.get('type', 'electric_field')
-        params = data.get('params', {})
+        # Accept both 'params' and 'parameters' for flexibility
+        params = data.get('parameters', data.get('params', {}))
         
         # Validate simulation type
         valid_types = ['electric_field', 'magnetic_field', 'wave_motion', 'oscillation', 'em_wave']

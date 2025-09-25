@@ -14,19 +14,76 @@ def generate_electric_field_config(params=None):
             'showForces': True
         }
     
+    # Generate default positions based on charge count
+    charge_count = params.get('charges', 4)
+    default_positions = []
+    
+    # Create positions in a grid pattern
+    if charge_count == 2:
+        default_positions = [
+            {'x': 300, 'y': 300, 'charge': 1},
+            {'x': 500, 'y': 300, 'charge': -1}
+        ]
+    elif charge_count == 3:
+        default_positions = [
+            {'x': 250, 'y': 250, 'charge': 1},
+            {'x': 550, 'y': 250, 'charge': -1},
+            {'x': 400, 'y': 400, 'charge': 1}
+        ]
+    elif charge_count == 4:
+        default_positions = [
+            {'x': 200, 'y': 200, 'charge': 1},
+            {'x': 600, 'y': 200, 'charge': -1},
+            {'x': 200, 'y': 400, 'charge': 1},
+            {'x': 600, 'y': 400, 'charge': -1}
+        ]
+    elif charge_count == 5:
+        default_positions = [
+            {'x': 150, 'y': 200, 'charge': 1},
+            {'x': 350, 'y': 200, 'charge': -1},
+            {'x': 550, 'y': 200, 'charge': 1},
+            {'x': 250, 'y': 400, 'charge': -1},
+            {'x': 450, 'y': 400, 'charge': 1}
+        ]
+    elif charge_count == 6:
+        default_positions = [
+            {'x': 150, 'y': 180, 'charge': 1},
+            {'x': 350, 'y': 180, 'charge': -1},
+            {'x': 550, 'y': 180, 'charge': 1},
+            {'x': 150, 'y': 380, 'charge': -1},
+            {'x': 350, 'y': 380, 'charge': 1},
+            {'x': 550, 'y': 380, 'charge': -1}
+        ]
+    elif charge_count == 7:
+        default_positions = [
+            {'x': 120, 'y': 160, 'charge': 1},
+            {'x': 280, 'y': 160, 'charge': -1},
+            {'x': 440, 'y': 160, 'charge': 1},
+            {'x': 600, 'y': 160, 'charge': -1},
+            {'x': 200, 'y': 320, 'charge': 1},
+            {'x': 360, 'y': 320, 'charge': -1},
+            {'x': 520, 'y': 320, 'charge': 1}
+        ]
+    else:  # 8 charges
+        default_positions = [
+            {'x': 120, 'y': 150, 'charge': 1},
+            {'x': 280, 'y': 150, 'charge': -1},
+            {'x': 440, 'y': 150, 'charge': 1},
+            {'x': 600, 'y': 150, 'charge': -1},
+            {'x': 120, 'y': 300, 'charge': -1},
+            {'x': 280, 'y': 300, 'charge': 1},
+            {'x': 440, 'y': 300, 'charge': -1},
+            {'x': 600, 'y': 300, 'charge': 1}
+        ]
+    
     return {
         'type': 'electric_field',
         'config': {
             'charges': {
-                'count': params.get('charges', 4),
+                'count': charge_count,
                 'minCharge': -2,
                 'maxCharge': 2,
-                'defaultPositions': [
-                    {'x': 200, 'y': 200, 'charge': 1},
-                    {'x': 600, 'y': 200, 'charge': -1},
-                    {'x': 200, 'y': 400, 'charge': 1},
-                    {'x': 600, 'y': 400, 'charge': -1}
-                ]
+                'defaultPositions': default_positions
             },
             'field': {
                 'strength': params.get('fieldStrength', 1.0),
@@ -48,7 +105,7 @@ def generate_electric_field_config(params=None):
             }
         },
         'controls': {
-            'charges': {'min': 2, 'max': 8, 'value': params.get('charges', 4)},
+            'charges': {'min': 2, 'max': 8, 'value': charge_count},
             'fieldStrength': {'min': 0.1, 'max': 3, 'value': params.get('fieldStrength', 1.0)},
             'showField': {'value': params.get('showField', True)},
             'showForces': {'value': params.get('showForces', True)}
@@ -65,6 +122,55 @@ def generate_magnetic_field_config(params=None):
             'cyclotronMotion': True
         }
     
+    # Generate particle arrays based on particle count
+    particle_count = params.get('particleCount', 3)
+    charges = []
+    masses = []
+    velocities = []
+    initial_positions = []
+    
+    # Predefined configurations for different particle counts
+    base_configs = [
+        # 1 particle
+        [{'charge': 1, 'mass': 1, 'vel': {'x': 2, 'y': 0}, 'pos': {'x': 400, 'y': 300}}],
+        # 2 particles
+        [
+            {'charge': 1, 'mass': 1, 'vel': {'x': 2, 'y': 0}, 'pos': {'x': 300, 'y': 250}},
+            {'charge': -1, 'mass': 1, 'vel': {'x': -1.5, 'y': 1}, 'pos': {'x': 500, 'y': 350}}
+        ],
+        # 3 particles
+        [
+            {'charge': 1, 'mass': 1, 'vel': {'x': 2, 'y': 0}, 'pos': {'x': 100, 'y': 300}},
+            {'charge': -1, 'mass': 1, 'vel': {'x': -1.5, 'y': 1}, 'pos': {'x': 400, 'y': 150}},
+            {'charge': 1, 'mass': 1, 'vel': {'x': 0, 'y': -2}, 'pos': {'x': 700, 'y': 450}}
+        ],
+        # 4 particles
+        [
+            {'charge': 1, 'mass': 1, 'vel': {'x': 2, 'y': 0}, 'pos': {'x': 150, 'y': 200}},
+            {'charge': -1, 'mass': 1, 'vel': {'x': -1.5, 'y': 1}, 'pos': {'x': 350, 'y': 150}},
+            {'charge': 1, 'mass': 1, 'vel': {'x': 0, 'y': -2}, 'pos': {'x': 550, 'y': 400}},
+            {'charge': -1, 'mass': 1, 'vel': {'x': 1, 'y': 1.5}, 'pos': {'x': 650, 'y': 300}}
+        ],
+        # 5 particles
+        [
+            {'charge': 1, 'mass': 1, 'vel': {'x': 2, 'y': 0}, 'pos': {'x': 120, 'y': 180}},
+            {'charge': -1, 'mass': 1, 'vel': {'x': -1.5, 'y': 1}, 'pos': {'x': 300, 'y': 120}},
+            {'charge': 1, 'mass': 1, 'vel': {'x': 0, 'y': -2}, 'pos': {'x': 480, 'y': 350}},
+            {'charge': -1, 'mass': 1, 'vel': {'x': 1, 'y': 1.5}, 'pos': {'x': 600, 'y': 250}},
+            {'charge': 1, 'mass': 1, 'vel': {'x': -1, 'y': -1}, 'pos': {'x': 200, 'y': 450}}
+        ]
+    ]
+    
+    # Use the appropriate configuration
+    config_index = min(particle_count - 1, len(base_configs) - 1)
+    selected_config = base_configs[config_index][:particle_count]
+    
+    for particle in selected_config:
+        charges.append(particle['charge'])
+        masses.append(particle['mass'])
+        velocities.append(particle['vel'])
+        initial_positions.append(particle['pos'])
+    
     return {
         'type': 'magnetic_field',
         'config': {
@@ -75,19 +181,11 @@ def generate_magnetic_field_config(params=None):
                 'showFieldLines': params.get('showFieldLines', True)
             },
             'particles': {
-                'count': params.get('particleCount', 3),
-                'charges': [1, -1, 1],  # Mix of positive and negative
-                'masses': [1, 1, 1],
-                'velocities': [
-                    {'x': 2, 'y': 0},
-                    {'x': -1.5, 'y': 1},
-                    {'x': 0, 'y': -2}
-                ],
-                'initialPositions': [
-                    {'x': 100, 'y': 300},
-                    {'x': 400, 'y': 150},
-                    {'x': 700, 'y': 450}
-                ]
+                'count': particle_count,
+                'charges': charges,
+                'masses': masses,
+                'velocities': velocities,
+                'initialPositions': initial_positions
             },
             'physics': {
                 'cyclotronMotion': params.get('cyclotronMotion', True),
@@ -103,7 +201,7 @@ def generate_magnetic_field_config(params=None):
         },
         'controls': {
             'fieldStrength': {'min': 0.1, 'max': 2, 'value': params.get('fieldStrength', 1.0)},
-            'particleCount': {'min': 1, 'max': 5, 'value': params.get('particleCount', 3)},
+            'particleCount': {'min': 1, 'max': 5, 'value': particle_count},
             'showFieldLines': {'value': params.get('showFieldLines', True)},
             'cyclotronMotion': {'value': params.get('cyclotronMotion', True)}
         }
@@ -166,19 +264,43 @@ def generate_oscillation_config(params=None):
             'drivingForce': 0
         }
     
+    # Generate oscillator arrays based on count
+    oscillator_count = params.get('oscillatorCount', 3)
+    natural_frequencies = []
+    amplitudes = []
+    phases = []
+    positions = []
+    
+    # Base frequency and amplitude ranges
+    base_frequency = 1.0
+    base_amplitude = 60
+    
+    for i in range(oscillator_count):
+        # Generate slightly different frequencies for interesting beating patterns
+        freq_variation = 0.2 * (i - oscillator_count/2) / oscillator_count
+        natural_frequencies.append(base_frequency + freq_variation)
+        
+        # Generate amplitudes with some variation
+        amp_variation = 20 * (0.5 - abs(i - oscillator_count/2) / oscillator_count)
+        amplitudes.append(base_amplitude + amp_variation)
+        
+        # Generate phases
+        phases.append(i * 0.5)
+        
+        # Generate positions in a line
+        spacing = 600 / (oscillator_count + 1)
+        x_pos = 100 + (i + 1) * spacing
+        positions.append({'x': x_pos, 'y': 300})
+    
     return {
         'type': 'oscillation',
         'config': {
             'oscillators': {
-                'count': params.get('oscillatorCount', 3),
-                'naturalFrequencies': [1.0, 1.2, 0.8],
-                'amplitudes': [60, 50, 70],
-                'phases': [0, 0.5, 1.0],
-                'positions': [
-                    {'x': 200, 'y': 300},
-                    {'x': 400, 'y': 300},
-                    {'x': 600, 'y': 300}
-                ]
+                'count': oscillator_count,
+                'naturalFrequencies': natural_frequencies,
+                'amplitudes': amplitudes,
+                'phases': phases,
+                'positions': positions
             },
             'coupling': {
                 'strength': params.get('coupling', 0.1),
@@ -202,7 +324,7 @@ def generate_oscillation_config(params=None):
             }
         },
         'controls': {
-            'oscillatorCount': {'min': 2, 'max': 5, 'value': params.get('oscillatorCount', 3)},
+            'oscillatorCount': {'min': 2, 'max': 5, 'value': oscillator_count},
             'coupling': {'min': 0, 'max': 0.5, 'value': params.get('coupling', 0.1)},
             'damping': {'min': 0, 'max': 0.1, 'value': params.get('damping', 0.02)},
             'drivingForce': {'min': 0, 'max': 1, 'value': params.get('drivingForce', 0)}
