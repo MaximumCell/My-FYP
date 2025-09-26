@@ -90,3 +90,37 @@ export const useRecommendModel = () => {
     },
   });
 };
+
+// Analyze data quality and get preview
+export const useAnalyzeData = () => {
+  return useMutation<any, ApiError, { file: File; target_column?: string }>({
+    mutationFn: async ({ file, target_column }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (target_column) {
+        formData.append('target_column', target_column);
+      }
+      const { data } = await api.post('/ml/analyze_data', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+  });
+};
+
+// Get sample input format for testing
+export const useSampleInput = () => {
+  return useMutation<any, ApiError, { file: File; target_column?: string }>({
+    mutationFn: async ({ file, target_column }) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      if (target_column) {
+        formData.append('target_column', target_column);
+      }
+      const { data } = await api.post('/ml/sample_input', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+  });
+};

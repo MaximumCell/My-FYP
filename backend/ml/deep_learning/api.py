@@ -27,50 +27,58 @@ def _save_uploaded_file(file_storage, dest_dir="/tmp") -> str:
 
 
 def train_deep(model_name: str, file_storage, form: Dict[str, str]) -> Dict[str, Any]:
-    model_name = model_name.lower()
-    csv_path = _save_uploaded_file(file_storage)
-    config = {}
-    if 'config' in form and form['config']:
-        try:
-            config = json.loads(form['config'])
-        except Exception:
-            config = {}
-
-    # common params
-    epochs = int(form.get('epochs', 5))
-    batch_size = int(form.get('batch_size', 32))
-    target_column = form.get('target_column', None)
-
-    if model_name in ("mlp", "dense"):
-        # For MLP use a simple training script that expects numeric CSV
-        from .training.train_mlp import train_model as train_mlp
-        return train_mlp(csv_path, target_column=target_column, epochs=epochs, batch_size=batch_size, config=config)
-
-    if model_name == 'cnn':
-        image_shape = None
-        if 'image_shape' in form and form['image_shape']:
+    try:
+        model_name = model_name.lower()
+        csv_path = _save_uploaded_file(file_storage)
+        config = {}
+        if 'config' in form and form['config']:
             try:
-                # expect e.g. "(128,128,3)" or json list
-                image_shape = tuple(json.loads(form['image_shape']))
-            except Exception:
+                config = json.loads(form['config'])
+            except Exception as e:
+                return {"error": f"Invalid JSON config: {str(e)}"}
+
+        # common params
+        try:
+            epochs = int(form.get('epochs', 5))
+            batch_size = int(form.get('batch_size', 32))
+        except ValueError as e:
+            return {"error": f"Invalid numeric parameter: {str(e)}"}
+        
+        target_column = form.get('target_column', None)
+
+        if model_name in ("mlp", "dense"):
+            # For MLP use a simple training script that expects numeric CSV
+            from .training.train_mlp import train_model as train_mlp
+            return train_mlp(csv_path, target_column=target_column, epochs=epochs, batch_size=batch_size, config=config)
+
+        if model_name == 'cnn':
+            image_shape = None
+            if 'image_shape' in form and form['image_shape']:
                 try:
-                    image_shape = eval(form['image_shape'])
+                    # expect e.g. "(128,128,3)" or json list
+                    image_shape = tuple(json.loads(form['image_shape']))
                 except Exception:
-                    image_shape = None
-        if image_shape is None:
-            # sensible default
-            image_shape = (128, 128, 3)
-        return train_cnn.train_model(csv_path, image_shape=image_shape, target_column=target_column, epochs=epochs, batch_size=batch_size, config=config)
+                    try:
+                        image_shape = eval(form['image_shape'])
+                    except Exception:
+                        image_shape = None
+            if image_shape is None:
+                # sensible default
+                image_shape = (128, 128, 3)
+            return train_cnn.train_model(csv_path, image_shape=image_shape, target_column=target_column, epochs=epochs, batch_size=batch_size, config=config)
 
-    if model_name == 'sequence':
-        timesteps = int(form.get('timesteps', 10))
-        return train_sequence.train_model(csv_path, target_column=target_column, timesteps=timesteps, epochs=epochs, batch_size=batch_size, config=config)
+        if model_name == 'sequence':
+            timesteps = int(form.get('timesteps', 10))
+            return train_sequence.train_model(csv_path, target_column=target_column, timesteps=timesteps, epochs=epochs, batch_size=batch_size, config=config)
 
-    if model_name == 'transformer':
-        timesteps = int(form.get('timesteps', 10))
-        return train_transformer.train_model(csv_path, target_column=target_column, timesteps=timesteps, epochs=epochs, batch_size=batch_size, config=config)
+        if model_name == 'transformer':
+            timesteps = int(form.get('timesteps', 10))
+            return train_transformer.train_model(csv_path, target_column=target_column, timesteps=timesteps, epochs=epochs, batch_size=batch_size, config=config)
 
-    return {"error": f"Unsupported deep model: {model_name}"}
+        return {"error": f"Unsupported deep model: {model_name}"}
+    
+    except Exception as e:
+        return {"error": f"Training failed: {str(e)}"}
 
 
 def test_deep(model_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -79,6 +87,24 @@ def test_deep(model_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     if not model_path:
         # provide conventional defaults if not supplied
         model_path = payload.get('model', None)
+        
+        # If still no path, try to find the most recent model of this type
+        if not model_path or model_path == model_name:
+            trained_models_dir = os.path.join(os.getcwd(), 'trained_models')
+            if os.path.exists(trained_models_dir):
+                # Look for models that match the pattern
+                import glob
+                pattern = os.path.join(trained_models_dir, f'*{model_name}*.keras')
+                matching_files = glob.glob(pattern)
+                if matching_files:
+                    # Get the most recent one
+                    model_path = max(matching_files, key=os.path.getmtime)
+                else:
+                    # Try without the model name in filename
+                    pattern = os.path.join(trained_models_dir, '*.keras')
+                    matching_files = glob.glob(pattern)
+                    if matching_files:
+                        model_path = max(matching_files, key=os.path.getmtime)
 
     try:
         if model_name in ('mlp', 'dense'):

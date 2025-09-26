@@ -6,6 +6,7 @@ from ml.train_classifier import train_classifier, get_classifier_models, classif
 from ml.recommend_model import recommend_model
 from ml.get_coloum import get_coloum
 from ml.test_classifier import test_classifier
+from ml.data_analysis import analyze_data_quality, get_sample_input_format
 from ml.deep_learning import api as deep_api
 import os
 import pandas as pd
@@ -156,6 +157,48 @@ def get_columns():
             return jsonify(column_names), 500
         else:
             return jsonify({"columns": column_names}), 200
+
+@ml_bp.route('/analyze_data', methods=['POST'])
+def analyze_data():
+    """Analyze uploaded data for preview and quality insights."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    
+    file = request.files['file']
+    target_column = request.form.get('target_column', None)
+    
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    try:
+        result = analyze_data_quality(file, target_column)
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+    except Exception as e:
+        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+
+@ml_bp.route('/sample_input', methods=['POST'])
+def get_sample_input():
+    """Get sample input format for model testing."""
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    
+    file = request.files['file']
+    target_column = request.form.get('target_column', None)
+    
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    try:
+        result = get_sample_input_format(file, target_column)
+        if result.get('success'):
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+    except Exception as e:
+        return jsonify({"error": f"Failed to generate sample input: {str(e)}"}), 500
 
 
 # Deep learning endpoints

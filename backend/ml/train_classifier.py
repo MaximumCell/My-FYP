@@ -4,7 +4,7 @@ import os
 from flask import jsonify
 
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix, roc_auc_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, mean_squared_error, mean_absolute_error, r2_score, classification_report, confusion_matrix, roc_auc_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, OneHotEncoder, LabelEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.compose import ColumnTransformer
@@ -104,6 +104,17 @@ def train_classifier(file, model_name, target_column=None, test_size=0.2, hyperp
     recall = recall_score(y_test, y_pred, average='weighted', zero_division=0)
     f1 = f1_score(y_test, y_pred, average='weighted', zero_division=0)
     cm = confusion_matrix(y_test, y_pred)
+    
+    # Get detailed classification report
+    class_report = classification_report(y_test, y_pred, target_names=class_names, output_dict=True, zero_division=0)
+    
+    # Get class distribution from training and test sets
+    y_train_counts = pd.Series(y_train).value_counts().to_dict()
+    y_test_counts = pd.Series(y_test).value_counts().to_dict()
+    
+    # Convert indices to class names for better readability
+    train_class_distribution = {class_names[idx]: count for idx, count in y_train_counts.items() if idx < len(class_names)}
+    test_class_distribution = {class_names[idx]: count for idx, count in y_test_counts.items() if idx < len(class_names)}
 
     # Handle binary and multi-class ROC AUC
     roc_auc = None
@@ -124,9 +135,11 @@ def train_classifier(file, model_name, target_column=None, test_size=0.2, hyperp
     os.makedirs(model_dir, exist_ok=True)
     model_path = os.path.join(model_dir, f"{model_name}_classifier_pipeline.pkl")
 
+    # Capture input feature names
+    feature_names = X.columns.tolist()
+
     try:
-        # Attempt to capture input and transformed feature names
-        feature_names = X.columns.tolist()
+        # Attempt to capture transformed feature names
         feature_names_out = None
         try:
             feature_names_out = preprocessor.get_feature_names_out(feature_names)
@@ -170,7 +183,13 @@ def train_classifier(file, model_name, target_column=None, test_size=0.2, hyperp
         "f1_score": f1,
         "confusion_matrix": cm.tolist(),
         "roc_auc": roc_auc,
-        "class_names": class_names
+        "class_names": class_names,
+        "classification_report": class_report,
+        "train_class_distribution": train_class_distribution,
+        "test_class_distribution": test_class_distribution,
+        "n_train_samples": len(y_train),
+        "n_test_samples": len(y_test),
+        "n_features": len(feature_names) if feature_names else X_train.shape[1]
     }
 
 def get_classifier_models():

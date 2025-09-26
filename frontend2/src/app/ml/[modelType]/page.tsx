@@ -9,13 +9,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useModels, useColumns, useTrainModel, useTestModel, useRecommendModel } from '@/hooks/use-ml-api';
+import { useModels, useColumns, useTrainModel, useTestModel, useRecommendModel, useAnalyzeData, useSampleInput } from '@/hooks/use-ml-api';
 import type { ApiError, ModelType, TrainResponse } from '@/types/api';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import FileUpload from '@/components/ml/file-upload';
+import DataPreview from '@/components/ml/DataPreview';
+import EnhancedResults from '@/components/ml/EnhancedResults';
 import api from '@/lib/api';
 import ModelSelector from '../components/ModelSelector';
 import HyperparamsEditor from '../components/HyperparamsEditor';
@@ -51,6 +53,8 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
   const [featureInputs, setFeatureInputs] = useState<Record<string, string>>({});
   const [useJsonEditor, setUseJsonEditor] = useState<boolean>(false);
   const [downloadModelName, setDownloadModelName] = useState('');
+  const [dataAnalysis, setDataAnalysis] = useState<any>(null);
+  const [showDataPreview, setShowDataPreview] = useState<boolean>(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -77,6 +81,19 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
     }
   }, [columns, targetColumn]);
 
+  // Re-analyze data when target column changes
+  useEffect(() => {
+    if (file && targetColumn && showDataPreview) {
+      analyzeDataMutation.mutate(
+        { file, target_column: targetColumn },
+        {
+          onSuccess: (analysisData) => setDataAnalysis(analysisData),
+          onError: (error: ApiError) => console.warn('Re-analysis failed:', error)
+        }
+      );
+    }
+  }, [targetColumn, file, showDataPreview]);
+
   // Keep downloadModelName in sync with selectedModel when user hasn't manually changed it
   useEffect(() => {
     if (selectedModel) {
@@ -88,6 +105,8 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
   const trainMutation = useTrainModel(modelType);
   const testMutation = useTestModel(modelType);
   const recommendMutation = useRecommendModel();
+  const analyzeDataMutation = useAnalyzeData();
+  const sampleInputMutation = useSampleInput();
 
   const handleFileChange = (acceptedFiles: File[]) => {
     const newFile = acceptedFiles[0];
@@ -97,8 +116,28 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
       setTargetColumn('');
       setTrainResults(null);
       setRecommendation('');
+      setDataAnalysis(null);
+      setShowDataPreview(false);
+
+      // Get columns first
       columnsMutation.mutate(newFile, {
-        onSuccess: (data) => setColumns(data.columns),
+        onSuccess: (data) => {
+          setColumns(data.columns);
+          // Automatically analyze data for preview
+          analyzeDataMutation.mutate(
+            { file: newFile },
+            {
+              onSuccess: (analysisData) => {
+                setDataAnalysis(analysisData);
+                setShowDataPreview(true);
+              },
+              onError: (error: ApiError) => {
+                console.warn('Data analysis failed:', error);
+                // Don't show error toast, just continue without preview
+              }
+            }
+          );
+        },
         onError: (error: ApiError) => toast({ variant: 'destructive', title: 'Error getting columns', description: error.error }),
       });
     }
@@ -360,6 +399,14 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
                 <CardDescription>Upload your dataset, choose a model, and start training.</CardDescription>
               </CardHeader>
               <FileUpload onFileChange={handleFileChange} />
+
+              {/* Data Preview */}
+              {showDataPreview && dataAnalysis && (
+                <div className="mt-6">
+                  <DataPreview analysisData={dataAnalysis} />
+                </div>
+              )}
+
               {file && (
                 <div className="mt-4 space-y-4">
                   <p className="text-sm">File: <span className="font-medium text-primary">{file.name}</span></p>
@@ -415,8 +462,8 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
               )}
               {trainResults && (
                 <div className="mt-6">
-                  <h3 className="text-lg font-semibold">Training Results</h3>
-                  {renderMetrics(trainResults)}
+                  <h3 className="text-lg font-semibold mb-4">Training Results</h3>
+                  <EnhancedResults results={trainResults} modelType={modelType as 'regression' | 'classification'} />
                   {(() => {
                     const ev = generateEvaluation(trainResults, modelType);
                     return <EvalSummary percent={ev.percent} verdict={ev.verdict} advice={ev.advice} />;
