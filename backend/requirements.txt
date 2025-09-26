@@ -10,3 +10,5 @@ scipy
 pymongo
 python-dotenv
 pydantic
+cloudinary
+werkzeug
