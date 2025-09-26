@@ -16,6 +16,8 @@ plots
 trained_models
 trained_classifiers
 node_modules
+.env
+.env.local
 
 # Editor directories and files
 .vscode/*
@@ -27,3 +29,6 @@ node_modules
 *.njsproj
 *.sln
 *.sw?
+
+# Implementation planning
+implementation-plan.txt

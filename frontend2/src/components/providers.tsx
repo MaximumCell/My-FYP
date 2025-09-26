@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
+import { UserProvider } from '@/components/providers/user-provider';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -24,9 +25,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <QueryClientProvider client={queryClient}>
-        {children}
-        <Toaster />
-        <ReactQueryDevtools initialIsOpen={false} />
+        <UserProvider>
+          {children}
+          <Toaster />
+          <ReactQueryDevtools initialIsOpen={false} />
+        </UserProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

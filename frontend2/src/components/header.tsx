@@ -1,14 +1,21 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { Logo } from './icons';
 import { Button } from './ui/button';
 import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
 import { Menu } from 'lucide-react';
 import { useState } from 'react';
 import { ThemeToggle } from './theme-toggle';
+import {
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from '@clerk/nextjs';
 
 const navLinks = [
   { href: '/ml', label: 'ML Lab' },
@@ -27,7 +34,13 @@ export default function Header() {
       <div className="container flex h-14 items-center">
         <div className="mr-4 hidden md:flex">
           <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Logo className="h-6 w-6 text-primary" />
+            <Image
+              src="/logo.jpg"
+              alt="PhysicsLab Logo"
+              width={24}
+              height={24}
+              className="h-6 w-6 rounded"
+            />
             <span className="hidden font-bold sm:inline-block">PhysicsLab</span>
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
@@ -45,7 +58,7 @@ export default function Header() {
             ))}
           </nav>
         </div>
-        
+
         <div className="md:hidden">
           <Sheet open={isSheetOpen} onOpenChange={setSheetOpen}>
             <SheetTrigger asChild>
@@ -55,7 +68,13 @@ export default function Header() {
             </SheetTrigger>
             <SheetContent side="left">
               <Link href="/" className="flex items-center space-x-2" onClick={closeSheet}>
-                <Logo className="h-6 w-6 text-primary" />
+                <Image
+                  src="/logo.jpg"
+                  alt="PhysicsLab Logo"
+                  width={24}
+                  height={24}
+                  className="h-6 w-6 rounded"
+                />
                 <span className="font-bold">PhysicsLab</span>
               </Link>
               <div className="mt-8 flex flex-col space-y-4">
@@ -76,9 +95,32 @@ export default function Header() {
             </SheetContent>
           </Sheet>
         </div>
-        
+
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
-          <ThemeToggle />
+          <div className="flex items-center gap-4">
+            <SignedOut>
+              <SignInButton>
+                <Button variant="ghost" size="sm">
+                  Sign In
+                </Button>
+              </SignInButton>
+              <SignUpButton>
+                <Button size="sm">
+                  Sign Up
+                </Button>
+              </SignUpButton>
+            </SignedOut>
+            <SignedIn>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: "h-8 w-8"
+                  }
+                }}
+              />
+            </SignedIn>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </header>

@@ -7,3 +7,6 @@ matplotlib
 joblib
 numpy
 scipy
+pymongo
+python-dotenv
+pydantic

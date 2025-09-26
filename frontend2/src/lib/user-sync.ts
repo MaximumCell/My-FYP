@@ -1,0 +1,178 @@
+/**
+ * User sync utilities for integrating Clerk with MongoDB backend
+ */
+
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+    ? process.env.NEXT_PUBLIC_API_URL || 'https://your-backend-url.com'
+    : 'http://localhost:5000';
+
+export interface UserSyncData {
+    clerk_user_id: string;
+    email: string;
+    name: string;
+}
+
+export interface UserSyncResponse {
+    message: string;
+    user: {
+        id: string;
+        clerk_user_id: string;
+        email: string;
+        name: string;
+        created_at: string;
+        updated_at: string;
+        usage_analytics: {
+            total_models_trained: number;
+            total_simulations_run: number;
+            total_training_time: number;
+            last_activity: string | null;
+        };
+    };
+}
+
+export interface DashboardData {
+    user: {
+        name: string;
+        email: string;
+        member_since: string;
+    };
+    quick_stats: {
+        models_count: number;
+        simulations_count: number;
+        total_training_time: string;
+        storage_used: string;
+    };
+    recent_activity: {
+        recent_models: any[];
+        recent_simulations: any[];
+    };
+    usage_analytics: {
+        models_this_month: number;
+        simulations_this_month: number;
+        avg_training_time: number;
+        last_activity: string | null;
+    };
+}
+
+/**
+ * Sync user with MongoDB backend
+ */
+export async function syncUserWithBackend(userData: UserSyncData): Promise<UserSyncResponse | null> {
+    try {
+        console.log('Syncing user with backend:', userData.email);
+
+        const response = await fetch(`${API_BASE_URL}/api/users/sync`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(userData),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const result: UserSyncResponse = await response.json();
+        console.log('User synced successfully:', result.user.email);
+        return result;
+    } catch (error) {
+        console.error('Failed to sync user with backend:', error);
+        return null;
+    }
+}
+
+/**
+ * Get user dashboard data
+ */
+export async function getUserDashboard(clerkUserId: string): Promise<DashboardData | null> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/dashboard?clerk_user_id=${clerkUserId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const result: DashboardData = await response.json();
+        return result;
+    } catch (error) {
+        console.error('Failed to get dashboard data:', error);
+        return null;
+    }
+}
+
+/**
+ * Get user analytics
+ */
+export async function getUserAnalytics(clerkUserId: string): Promise<any | null> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/analytics?clerk_user_id=${clerkUserId}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error('Failed to get analytics:', error);
+        return null;
+    }
+}
+
+/**
+ * Update user analytics (internal use)
+ */
+export async function updateUserAnalytics(clerkUserId: string, analytics: Record<string, any>): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/analytics/update`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                clerk_user_id: clerkUserId,
+                analytics,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Failed to update analytics:', error);
+        return false;
+    }
+}
+
+/**
+ * Check backend health
+ */
+export async function checkBackendHealth(): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            method: 'GET',
+            timeout: 5000,
+        } as RequestInit);
+
+        return response.ok;
+    } catch (error) {
+        console.error('Backend health check failed:', error);
+        return false;
+    }
+}
