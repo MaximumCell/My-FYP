@@ -14,6 +14,7 @@ from models.user import UserService
 from utils.cloudinary_upload import CloudinaryUploadManager, CloudinaryUploadError
 from utils.error_handler import CloudinaryErrorHandler, ErrorCode
 from utils.database import get_database
+from utils.analytics_tracker import track_activity, get_analytics_tracker
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -172,11 +173,21 @@ def upload_model():
                 "Failed to save model metadata"
             ), 500
         
-        # Update user analytics
-        user_service.update_usage_analytics(
-            user_id, 
-            {'total_models_trained': 1}  # This would increment the existing count
-        )
+        # Track model training activity
+        clerk_user_id = request.headers.get('X-Clerk-User-ID')
+        if clerk_user_id:
+            tracker = get_analytics_tracker()
+            if tracker:
+                model_data = {
+                    "model_id": str(created_model.id),
+                    "model_type": model_type,
+                    "performance_metrics": performance_metrics_data
+                }
+                tracker.track_model_training(clerk_user_id, training_time_float, model_data)
+                
+                # Track file upload size
+                file_size = len(file_data) if file_data else 0
+                tracker.track_file_upload(clerk_user_id, file_size, "model")
         
         return CloudinaryErrorHandler.format_success_response(
             created_model.model_dump(),

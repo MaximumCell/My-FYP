@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useUserSync } from '@/components/providers/user-provider';
 import { useUser } from '@clerk/nextjs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { EnhancedStatCard, ActivityFeed, QuickAction } from '@/components/enhanced-dashboard';
+import { AdvancedAnalytics } from '@/components/advanced-analytics';
 import {
     BarChart3,
     Clock,
@@ -26,9 +28,19 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 
+// Helper function to format training time
+const formatTrainingTime = (seconds: number): string => {
+    if (seconds === 0) return '0s';
+    if (seconds < 1) return `${(seconds * 1000).toFixed(0)}ms`;
+    if (seconds < 60) return `${seconds.toFixed(2)}s`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${(seconds % 60).toFixed(0)}s`;
+    return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+};
+
 export function UserDashboard() {
     const { dashboardData, isLoading, refreshDashboard } = useUserSync();
     const { user: clerkUser } = useUser(); // Get Clerk user for profile image
+    const [analyticsExpanded, setAnalyticsExpanded] = useState(false);
 
     if (isLoading) {
         return <DashboardSkeleton />;
@@ -38,7 +50,7 @@ export function UserDashboard() {
         return null;
     }
 
-    const { user, quick_stats, usage_analytics } = dashboardData;
+    const { user, quick_stats, usage_analytics, performance_overview } = dashboardData;
 
     // Transform recent activity for ActivityFeed component
     const recentActivities = [
@@ -124,23 +136,35 @@ export function UserDashboard() {
                 <EnhancedStatCard
                     title="ML Models Created"
                     value={quick_stats.models_count}
-                    change={{ value: 12, type: 'increase', period: 'this month' }}
+                    change={{
+                        value: usage_analytics.models_this_week,
+                        type: usage_analytics.models_this_week > 0 ? 'increase' : 'decrease',
+                        period: 'this week'
+                    }}
                     icon={<BarChart3 className="h-6 w-6" />}
                     color="primary"
-                    progress={75}
+                    progress={Math.min((quick_stats.models_count / 10) * 100, 100)}
                 />
                 <EnhancedStatCard
                     title="Simulations Run"
                     value={quick_stats.simulations_count}
-                    change={{ value: 8, type: 'increase', period: 'this month' }}
+                    change={{
+                        value: usage_analytics.simulations_this_week,
+                        type: usage_analytics.simulations_this_week > 0 ? 'increase' : 'decrease',
+                        period: 'this week'
+                    }}
                     icon={<Zap className="h-6 w-6" />}
                     color="accent"
-                    progress={60}
+                    progress={Math.min((quick_stats.simulations_count / 10) * 100, 100)}
                 />
                 <EnhancedStatCard
                     title="Training Time"
-                    value={`${quick_stats.total_training_time}s`}
-                    change={{ value: 5, type: 'decrease', period: 'avg' }}
+                    value={formatTrainingTime(usage_analytics.avg_training_time)}
+                    change={{
+                        value: Math.round((usage_analytics.avg_training_time / 60) * 100) / 100,
+                        type: 'increase',
+                        period: 'avg'
+                    }}
                     icon={<Clock className="h-6 w-6" />}
                     color="green"
                 />
@@ -149,7 +173,7 @@ export function UserDashboard() {
                     value={quick_stats.storage_used}
                     icon={<Database className="h-6 w-6" />}
                     color="blue"
-                    progress={45}
+                    progress={Math.min(45, 100)} // Could be calculated from actual storage limits
                 />
             </div>
 
@@ -211,18 +235,30 @@ export function UserDashboard() {
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-primary">{usage_analytics.models_this_month}</div>
                                 <div className="text-sm text-muted-foreground">Models this month</div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                    {usage_analytics.models_this_week} this week
+                                </div>
                             </div>
                             <div className="text-center">
                                 <div className="text-2xl font-bold text-accent">{usage_analytics.simulations_this_month}</div>
                                 <div className="text-sm text-muted-foreground">Simulations this month</div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                    {usage_analytics.simulations_this_week} this week
+                                </div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-green-600">{usage_analytics.avg_training_time}s</div>
+                                <div className="text-2xl font-bold text-green-600">{formatTrainingTime(usage_analytics.avg_training_time)}</div>
                                 <div className="text-sm text-muted-foreground">Avg training time</div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                    {performance_overview?.most_used_model_type || 'N/A'}
+                                </div>
                             </div>
                             <div className="text-center">
-                                <div className="text-2xl font-bold text-blue-600">98%</div>
+                                <div className="text-2xl font-bold text-blue-600">{performance_overview?.success_rate || 98}%</div>
                                 <div className="text-sm text-muted-foreground">Success rate</div>
+                                <div className="text-xs text-muted-foreground mt-1">
+                                    Score: {performance_overview?.productivity_score || 0}
+                                </div>
                             </div>
                         </div>
                     </CardContent>
@@ -271,6 +307,13 @@ export function UserDashboard() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Advanced Analytics */}
+            <AdvancedAnalytics
+                clerkUserId={clerkUser?.id || ''}
+                isExpanded={analyticsExpanded}
+                onToggle={() => setAnalyticsExpanded(!analyticsExpanded)}
+            />
         </div>
     );
 }

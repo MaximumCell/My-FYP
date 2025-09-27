@@ -43,14 +43,34 @@ export interface DashboardData {
         storage_used: string;
     };
     recent_activity: {
-        recent_models: any[];
-        recent_simulations: any[];
+        recent_models: Array<{
+            id: string;
+            name: string;
+            type: string;
+            created_at: string;
+            performance?: any;
+        }>;
+        recent_simulations: Array<{
+            id: string;
+            name: string;
+            type: string;
+            created_at: string;
+            execution_time?: number;
+        }>;
     };
     usage_analytics: {
         models_this_month: number;
         simulations_this_month: number;
+        models_this_week: number;
+        simulations_this_week: number;
         avg_training_time: number;
         last_activity: string | null;
+    };
+    performance_overview: {
+        total_projects: number;
+        success_rate: number;
+        most_used_model_type: string;
+        productivity_score: number;
     };
 }
 
@@ -173,6 +193,130 @@ export async function checkBackendHealth(): Promise<boolean> {
         return response.ok;
     } catch (error) {
         console.error('Backend health check failed:', error);
+        return false;
+    }
+}
+
+/**
+ * Get user analytics trends
+ */
+export async function getUserAnalyticsTrends(clerkUserId: string, days: number = 30, granularity: string = 'daily'): Promise<any | null> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/analytics/trends?clerk_user_id=${clerkUserId}&days=${days}&granularity=${granularity}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error('Failed to get analytics trends:', error);
+        return null;
+    }
+}
+
+/**
+ * Get user performance metrics
+ */
+export async function getUserPerformanceMetrics(clerkUserId: string, period: string = 'month'): Promise<any | null> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/analytics/performance?clerk_user_id=${clerkUserId}&period=${period}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error('Failed to get performance metrics:', error);
+        return null;
+    }
+}
+
+/**
+ * Get analytics comparison
+ */
+export async function getAnalyticsComparison(clerkUserId: string, period: string = 'month', compareWith: string = 'previous'): Promise<any | null> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/analytics/compare?clerk_user_id=${clerkUserId}&period=${period}&compare_with=${compareWith}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error('Failed to get analytics comparison:', error);
+        return null;
+    }
+}
+
+/**
+ * Get analytics breakdown
+ */
+export async function getAnalyticsBreakdown(clerkUserId: string, type: string = 'model_types', period: string = 'month'): Promise<any | null> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/analytics/breakdown?clerk_user_id=${clerkUserId}&type=${type}&period=${period}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(errorData.error || `HTTP ${response.status}`);
+        }
+
+        const result = await response.json();
+        return result;
+    } catch (error) {
+        console.error('Failed to get analytics breakdown:', error);
+        return null;
+    }
+}
+
+/**
+ * Invalidate user cache
+ */
+export async function invalidateUserCache(clerkUserId: string): Promise<boolean> {
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/users/cache/invalidate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ clerk_user_id: clerkUserId }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        return true;
+    } catch (error) {
+        console.error('Failed to invalidate cache:', error);
         return false;
     }
 }

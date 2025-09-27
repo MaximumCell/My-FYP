@@ -2,7 +2,17 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useUser } from '@clerk/nextjs';
-import { syncUserWithBackend, getUserDashboard, DashboardData, checkBackendHealth } from '@/lib/user-sync';
+import {
+    syncUserWithBackend,
+    getUserDashboard,
+    DashboardData,
+    checkBackendHealth,
+    getUserAnalyticsTrends,
+    getUserPerformanceMetrics,
+    getAnalyticsComparison,
+    getAnalyticsBreakdown,
+    invalidateUserCache
+} from '@/lib/user-sync';
 
 interface UserContextType {
     isBackendSynced: boolean;

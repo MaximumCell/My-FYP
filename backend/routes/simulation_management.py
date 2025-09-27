@@ -16,6 +16,7 @@ from models.user import UserService
 from utils.cloudinary_upload import CloudinaryUploadManager, CloudinaryUploadError
 from utils.error_handler import CloudinaryErrorHandler, ErrorCode
 from utils.database import get_database
+from utils.analytics_tracker import get_analytics_tracker
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -205,11 +206,23 @@ def save_simulation():
                 "Failed to save simulation metadata"
             ), 500
         
-        # Update user analytics
-        user_service.update_usage_analytics(
-            user_id, 
-            {'total_simulations_run': 1}  # This would increment the existing count
-        )
+        # Track simulation run activity
+        clerk_user_id = request.headers.get('X-Clerk-User-ID')
+        if clerk_user_id:
+            tracker = get_analytics_tracker()
+            if tracker:
+                simulation_data = {
+                    "simulation_id": str(created_simulation.id),
+                    "simulation_type": simulation_type,
+                    "config": config_data
+                }
+                tracker.track_simulation_run(clerk_user_id, execution_time_float, simulation_data)
+                
+                # Track file upload size (HTML + thumbnail)
+                html_size = len(plot_html.encode('utf-8')) if plot_html else 0
+                thumbnail_size = len(plot_thumbnail) if plot_thumbnail else 0
+                total_size = html_size + thumbnail_size
+                tracker.track_file_upload(clerk_user_id, total_size, "simulation")
         
         return CloudinaryErrorHandler.format_success_response(
             created_simulation.model_dump(),
