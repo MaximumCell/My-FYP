@@ -1,7 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, Calculator, Zap, Spline, Atom, Move } from 'lucide-react';
+import { ArrowRight, Calculator, Zap, Spline, Atom, Move, Save } from 'lucide-react';
 import Image from 'next/image';
 
 const simulationTypes = [
@@ -70,6 +70,43 @@ export default function SimulationPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {/* Saved Simulations Card */}
+        <Card className="group flex flex-col overflow-hidden transition-all duration-300 border-border/50 hover:border-primary/20 hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1 bg-gradient-to-br from-primary/5 via-transparent to-accent/5">
+          <div className="relative h-48 w-full overflow-hidden">
+            <Image
+              src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&h=600&fit=crop&crop=center"
+              alt="Saved Simulations"
+              fill
+              style={{ objectFit: 'cover' }}
+              className="transition-transform duration-300 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-primary/20 via-transparent to-transparent opacity-60 group-hover:opacity-80 transition-opacity duration-300" />
+            <div className="absolute top-4 right-4 p-2 bg-white/90 rounded-lg">
+              <Save className="h-5 w-5 text-primary" />
+            </div>
+          </div>
+          <CardHeader className="flex-row gap-4 items-center">
+            <div className="p-2 bg-primary/20 rounded-lg group-hover:bg-primary/30 transition-colors duration-300">
+              <Save className="h-8 w-8 text-primary" />
+            </div>
+            <CardTitle className="group-hover:text-primary transition-colors duration-300">Saved Simulations</CardTitle>
+          </CardHeader>
+          <CardContent className="flex-grow">
+            <CardDescription className="leading-relaxed">
+              Access and manage your previously saved simulations. View, share, or delete your saved plots and physics simulations.
+            </CardDescription>
+          </CardContent>
+          <CardContent className="pt-0">
+            <Link
+              href="/simulation/saved"
+              className="flex items-center justify-between w-full p-3 rounded-lg text-sm font-semibold transition-all duration-300 text-primary hover:bg-primary hover:text-primary-foreground group-hover:shadow-md"
+            >
+              <span>View Saved Simulations</span>
+              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </Link>
+          </CardContent>
+        </Card>
+
         {simulationTypes.map((sim) => (
           <Card key={sim.name} className={`group flex flex-col overflow-hidden transition-all duration-300 border-border/50 hover:border-primary/20 ${sim.disabled ? 'opacity-50 cursor-not-allowed' : 'hover:shadow-2xl hover:shadow-primary/10 hover:-translate-y-1'}`}>
             <div className="relative h-48 w-full overflow-hidden">
@@ -96,8 +133,8 @@ export default function SimulationPage() {
               <Link
                 href={sim.disabled ? '#' : sim.link}
                 className={`flex items-center justify-between w-full p-3 rounded-lg text-sm font-semibold transition-all duration-300 ${sim.disabled
-                    ? 'text-muted-foreground bg-muted/30'
-                    : 'text-primary hover:bg-primary hover:text-primary-foreground group-hover:shadow-md'
+                  ? 'text-muted-foreground bg-muted/30'
+                  : 'text-primary hover:bg-primary hover:text-primary-foreground group-hover:shadow-md'
                   }`}
               >
                 <span>{sim.disabled ? 'Coming Soon' : 'Launch Simulator'}</span>

@@ -178,6 +178,24 @@ export function UserDashboard() {
                 />
             </div>
 
+            {/* Saved Items */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <QuickAction
+                    title="Saved Models"
+                    description={`View your ${quick_stats.models_count} saved ML models`}
+                    icon={<BarChart3 className="h-8 w-8" />}
+                    color="from-indigo-500 to-indigo-600"
+                    onClick={() => window.location.href = '/ml/saved'}
+                />
+                <QuickAction
+                    title="Saved Simulations"
+                    description={`Manage your ${quick_stats.simulations_count} saved simulations`}
+                    icon={<Zap className="h-8 w-8" />}
+                    color="from-emerald-500 to-emerald-600"
+                    onClick={() => window.location.href = '/simulation/saved'}
+                />
+            </div>
+
             {/* Analytics and Activity */}
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                 {/* Performance Overview */}

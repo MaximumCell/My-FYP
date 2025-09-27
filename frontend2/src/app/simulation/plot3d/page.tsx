@@ -16,8 +16,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UploadCloud, Download, FileText, Settings, ChevronDown, Palette, ImageIcon, Zap, ArrowLeftRight } from 'lucide-react';
+import { Loader2, UploadCloud, Download, FileText, Settings, ChevronDown, Palette, ImageIcon, Zap, ArrowLeftRight, Save } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import SaveSimulationModal from '@/components/simulation/SaveSimulationModal';
 const MathTokenPicker = dynamic(() => import('@/components/math/MathTokenPicker'), { ssr: false });
 
 const equationSchema = z.object({
@@ -80,6 +81,9 @@ export default function Plot3DPage() {
     const [lastResponse, setLastResponse] = useState<any>(null);
     const [equationMode, setEquationMode] = useState(true);
     const [showAdvanced, setShowAdvanced] = useState(false);
+    const [plotHtml, setPlotHtml] = useState<string | null>(null);
+    const [plotExecutionTime, setPlotExecutionTime] = useState<number>(0);
+    const [showSaveModal, setShowSaveModal] = useState(false);
     const { toast } = useToast();
     const eqForm = useForm<EquationForm>({
         resolver: zodResolver(equationSchema),
@@ -138,6 +142,7 @@ export default function Plot3DPage() {
 
     const onSubmitEquation = async (data: EquationForm) => {
         setLoading(true);
+        const startTime = Date.now();
         try {
             const resp = await api.post('/simulation/plot3d', {
                 mode: 'equation',
@@ -170,6 +175,25 @@ export default function Plot3DPage() {
             if (url) {
                 setPlotUrl(url);
                 setLastResponse(j);
+                setPlotExecutionTime((Date.now() - startTime) / 1000);
+
+                // Store HTML content for saving (if it's an interactive plot)
+                if (j.html_content) {
+                    setPlotHtml(j.html_content);
+                } else if (url.includes('.html')) {
+                    // Fetch HTML content if not provided
+                    try {
+                        const htmlResp = await fetch(url);
+                        const htmlContent = await htmlResp.text();
+                        setPlotHtml(htmlContent);
+                    } catch (err) {
+                        console.warn('Could not fetch HTML content for saving');
+                        setPlotHtml(null);
+                    }
+                } else {
+                    setPlotHtml(null);
+                }
+
                 const isInteractive = url.includes('.html');
                 toast({
                     title: isInteractive ? 'Interactive 3D plot generated' : 'High-resolution 3D plot generated',
@@ -177,11 +201,13 @@ export default function Plot3DPage() {
                 });
             } else {
                 setPlotUrl(null);
+                setPlotHtml(null);
                 const msg = j.error || j.message || 'Server did not return a plot. Check your equation.';
                 toast({ variant: 'destructive', title: '3D plot failed', description: msg });
                 console.error('Plot3D: server response without url', j);
             }
         } catch (e: any) {
+            setPlotHtml(null);
             toast({ variant: 'destructive', title: '3D plot failed', description: e?.message || String(e) });
         } finally {
             setLoading(false);
@@ -243,6 +269,7 @@ export default function Plot3DPage() {
 
     const onSubmitCsv = async (data: CsvForm) => {
         setLoading(true);
+        const startTime = Date.now();
         const formData = new FormData();
 
         if (data.file && data.file[0]) {
@@ -286,6 +313,25 @@ export default function Plot3DPage() {
                     if (url) {
                         setPlotUrl(url);
                         setLastResponse(result);
+                        setPlotExecutionTime((Date.now() - startTime) / 1000);
+
+                        // Store HTML content for saving (if it's an interactive plot)
+                        if (result.html_content) {
+                            setPlotHtml(result.html_content);
+                        } else if (url.includes('.html')) {
+                            // Fetch HTML content if not provided
+                            try {
+                                const htmlResp = await fetch(url);
+                                const htmlContent = await htmlResp.text();
+                                setPlotHtml(htmlContent);
+                            } catch (err) {
+                                console.warn('Could not fetch HTML content for saving');
+                                setPlotHtml(null);
+                            }
+                        } else {
+                            setPlotHtml(null);
+                        }
+
                         toast({ title: 'Interactive CSV 3D plot generated', description: `${data.width}x${data.height} with rotation and zoom capabilities` });
                     } else {
                         throw new Error('No plot URL returned from server');
@@ -969,12 +1015,67 @@ export default function Plot3DPage() {
                         )}
                     </CardContent>
                     {plotUrl && (
-                        <CardFooter>
+                        <CardFooter className="flex gap-2">
                             <Button asChild><a href={plotUrl} target="_blank" rel="noreferrer"><Download className="mr-2 h-4 w-4" />Open</a></Button>
+                            {plotHtml && (
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setShowSaveModal(true)}
+                                    disabled={!plotHtml}
+                                >
+                                    <Save className="mr-2 h-4 w-4" />Save
+                                </Button>
+                            )}
                         </CardFooter>
                     )}
                 </Card>
             </div>
+
+            {/* Save Simulation Modal */}
+            {plotHtml && (
+                <SaveSimulationModal
+                    isOpen={showSaveModal}
+                    onClose={() => setShowSaveModal(false)}
+                    plotHtml={plotHtml}
+                    defaultConfig={{
+                        equation: equationMode ? eqForm.getValues('equation') : undefined,
+                        parameters: equationMode ? {
+                            x_min: eqForm.getValues('x_min'),
+                            x_max: eqForm.getValues('x_max'),
+                            y_min: eqForm.getValues('y_min'),
+                            y_max: eqForm.getValues('y_max'),
+                            resolution: eqForm.getValues('resolution'),
+                            width: eqForm.getValues('width'),
+                            height: eqForm.getValues('height'),
+                            dpi: eqForm.getValues('dpi'),
+                            style: eqForm.getValues('style'),
+                            format: eqForm.getValues('format'),
+                            colormap: eqForm.getValues('colormap')
+                        } : {
+                            x_col: csvForm.getValues('x_col'),
+                            y_col: csvForm.getValues('y_col'),
+                            z_col: csvForm.getValues('z_col'),
+                            width: csvForm.getValues('width'),
+                            height: csvForm.getValues('height'),
+                            dpi: csvForm.getValues('dpi'),
+                            style: csvForm.getValues('style'),
+                            format: csvForm.getValues('format'),
+                            colormap: csvForm.getValues('colormap')
+                        },
+                        variables: equationMode ? ['x', 'y'] : [csvForm.getValues('x_col'), csvForm.getValues('y_col'), csvForm.getValues('z_col')].filter(Boolean),
+                        plot_type: '3d'
+                    }}
+                    defaultMetadata={{
+                        simulation_name: equationMode ? `3D Plot: ${eqForm.getValues('equation')}` : `CSV 3D Plot: ${csvForm.getValues('z_col')} vs ${csvForm.getValues('x_col')}, ${csvForm.getValues('y_col')}`,
+                        simulation_type: 'plot3d',
+                        plot_title: equationMode ? eqForm.getValues('title') : csvForm.getValues('title'),
+                        x_label: equationMode ? eqForm.getValues('xlabel') : csvForm.getValues('xlabel'),
+                        y_label: equationMode ? eqForm.getValues('ylabel') : csvForm.getValues('ylabel'),
+                        z_label: equationMode ? eqForm.getValues('zlabel') : csvForm.getValues('zlabel')
+                    }}
+                    executionTime={plotExecutionTime}
+                />
+            )}
         </div>
     );
 }

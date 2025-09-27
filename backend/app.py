@@ -10,6 +10,7 @@ from routes.simulation_routes import simulation_bp
 from routes.ai_routes import ai_bp
 from routes.user_routes import user_bp
 from routes.model_management import model_bp
+from routes.simulation_management import simulation_bp as simulation_mgmt_bp
 from utils.database import init_database, close_database, get_database
 from datetime import datetime
 import atexit
@@ -52,6 +53,7 @@ app.register_blueprint(simulation_bp, url_prefix='/simulation')  # Restore prefi
 app.register_blueprint(ai_bp, url_prefix='/ai')
 app.register_blueprint(user_bp, url_prefix='/api/users')  # New user routes
 app.register_blueprint(model_bp)  # Model management routes (already includes /api/models prefix)
+app.register_blueprint(simulation_mgmt_bp)  # Simulation management routes (already includes /api/simulations prefix)
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])
