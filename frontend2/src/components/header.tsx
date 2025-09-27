@@ -21,6 +21,7 @@ const navLinks = [
   { href: '/ml', label: 'ML Lab' },
   { href: '/simulation', label: 'Simulation' },
   { href: '/ai', label: 'AI Tutor' },
+  { href: '/docs', label: 'Docs' },
 ];
 
 export default function Header() {

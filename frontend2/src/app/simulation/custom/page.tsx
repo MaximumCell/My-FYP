@@ -166,12 +166,8 @@ export default function CustomSimulationPage() {
                           {predefinedEquations.map(eq => (
                             <SelectItem key={eq.value} value={eq.value}>{eq.label}</SelectItem>
                           ))}
-                          <SelectItem value="custom">Custom Equation</SelectItem>
                         </SelectContent>
                       </Select>
-                      {form.watch('equation') === 'custom' &&
-                        <Input placeholder="e.g. 2*x + 1" className="mt-2" {...field} />
-                      }
                       <FormMessage />
                     </FormItem>
                   )}

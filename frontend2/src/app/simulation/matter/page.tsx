@@ -1,10 +1,8 @@
 "use client";
-import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import MatterSimulation from '@/components/MatterSimulation';
 
 const simulationTypes = [
     {
@@ -18,11 +16,6 @@ const simulationTypes = [
         description: 'Elastic and inelastic collision simulations with conservation of momentum and energy.'
     },
     {
-        id: 'spring',
-        name: 'Spring System',
-        description: 'Hooke\'s law demonstrations with mass-spring systems and oscillations.'
-    },
-    {
         id: 'projectile',
         name: 'Projectile Motion',
         description: 'Ballistic trajectory simulations with air resistance and gravity effects.'
@@ -30,30 +23,6 @@ const simulationTypes = [
 ];
 
 export default function MatterPhysicsPage() {
-    const [selectedSimulation, setSelectedSimulation] = useState<string | null>(null);
-
-    if (selectedSimulation) {
-        return (
-            <div>
-                <div className="flex items-center gap-4 mb-6">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedSimulation(null)}
-                        className="flex items-center gap-2"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to Simulations
-                    </Button>
-                    <h1 className="text-3xl font-headline font-bold">
-                        {simulationTypes.find(sim => sim.id === selectedSimulation)?.name} Simulation
-                    </h1>
-                </div>
-
-                <MatterSimulation simulationType={selectedSimulation} />
-            </div>
-        );
-    }
 
     return (
         <div>
@@ -76,17 +45,18 @@ export default function MatterPhysicsPage() {
                 {simulationTypes.map((sim) => (
                     <Card
                         key={sim.id}
-                        className="cursor-pointer transition-all duration-300 hover:shadow-lg hover:shadow-primary/20"
-                        onClick={() => setSelectedSimulation(sim.id)}
+                        className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/20"
                     >
                         <CardHeader>
                             <CardTitle>{sim.name}</CardTitle>
                             <CardDescription>{sim.description}</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <Button className="w-full">
-                                Launch {sim.name} Simulation
-                            </Button>
+                            <Link href={`/simulation/matter/${sim.id}`}>
+                                <Button className="w-full">
+                                    Launch {sim.name} Simulation
+                                </Button>
+                            </Link>
                         </CardContent>
                     </Card>
                 ))}
