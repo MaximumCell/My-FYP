@@ -344,6 +344,10 @@ const EnhancedResults: React.FC<EnhancedResultsProps> = ({ results, modelType })
 
     // For deep learning models, show specialized metrics
     if (modelType === 'deep-learning') {
+        // Check if this is a CNN/image classification model (has accuracy metrics)
+        const isCNNModel = results.final_accuracy !== undefined || results.accuracy !== undefined ||
+            results.final_val_accuracy !== undefined || results.val_accuracy !== undefined;
+
         return (
             <div className="space-y-6">
                 {/* Main Metrics Cards */}
@@ -354,7 +358,8 @@ const EnhancedResults: React.FC<EnhancedResultsProps> = ({ results, modelType })
                         </CardHeader>
                         <CardContent className="pt-0">
                             <p className="text-3xl font-bold text-blue-600">
-                                {results.final_loss ? results.final_loss.toFixed(4) : 'N/A'}
+                                {results.final_loss !== undefined ? results.final_loss.toFixed(4) :
+                                    results.loss !== undefined ? results.loss.toFixed(4) : 'N/A'}
                             </p>
                         </CardContent>
                     </Card>
@@ -365,29 +370,42 @@ const EnhancedResults: React.FC<EnhancedResultsProps> = ({ results, modelType })
                         </CardHeader>
                         <CardContent className="pt-0">
                             <p className="text-3xl font-bold text-purple-600">
-                                {results.final_val_loss ? results.final_val_loss.toFixed(4) : 'N/A'}
+                                {results.final_val_loss !== undefined ? results.final_val_loss.toFixed(4) :
+                                    results.val_loss !== undefined ? results.val_loss.toFixed(4) : 'N/A'}
                             </p>
                         </CardContent>
                     </Card>
 
                     <Card className="text-center">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-muted-foreground">Training MAE</CardTitle>
+                            <CardTitle className="text-sm text-muted-foreground">
+                                {isCNNModel ? 'Training Accuracy' : 'Training MAE'}
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-0">
                             <p className="text-3xl font-bold text-green-600">
-                                {results.final_mae ? results.final_mae.toFixed(4) : 'N/A'}
+                                {isCNNModel ?
+                                    (results.final_accuracy !== undefined ? `${(results.final_accuracy * 100).toFixed(1)}%` :
+                                        results.accuracy !== undefined ? `${(results.accuracy * 100).toFixed(1)}%` : 'N/A') :
+                                    (results.final_mae ? results.final_mae.toFixed(4) : 'N/A')
+                                }
                             </p>
                         </CardContent>
                     </Card>
 
                     <Card className="text-center">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm text-muted-foreground">Validation MAE</CardTitle>
+                            <CardTitle className="text-sm text-muted-foreground">
+                                {isCNNModel ? 'Validation Accuracy' : 'Validation MAE'}
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-0">
                             <p className="text-3xl font-bold text-orange-600">
-                                {results.final_val_mae ? results.final_val_mae.toFixed(4) : 'N/A'}
+                                {isCNNModel ?
+                                    (results.final_val_accuracy !== undefined ? `${(results.final_val_accuracy * 100).toFixed(1)}%` :
+                                        results.val_accuracy !== undefined ? `${(results.val_accuracy * 100).toFixed(1)}%` : 'N/A') :
+                                    (results.final_val_mae ? results.final_val_mae.toFixed(4) : 'N/A')
+                                }
                             </p>
                         </CardContent>
                     </Card>
@@ -415,38 +433,82 @@ const EnhancedResults: React.FC<EnhancedResultsProps> = ({ results, modelType })
                                         <div className="space-y-1 text-sm">
                                             <div className="flex justify-between">
                                                 <span className="text-muted-foreground">Epochs trained:</span>
-                                                <span className="font-medium">{results.epochs_trained || 'N/A'}</span>
+                                                <span className="font-medium">{results.epochs_trained || results.epochs || 'N/A'}</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="text-muted-foreground">Samples used:</span>
-                                                <span className="font-medium">{results.samples_used?.toLocaleString() || 'N/A'}</span>
+                                                <span className="font-medium">
+                                                    {results.samples_used?.toLocaleString() ||
+                                                        results.total_samples?.toLocaleString() ||
+                                                        results.training_samples?.toLocaleString() || 'N/A'}
+                                                </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Features:</span>
-                                                <span className="font-medium">{results.features_used || 'N/A'}</span>
+                                                <span className="text-muted-foreground">
+                                                    {isCNNModel ? 'Classes:' : 'Features:'}
+                                                </span>
+                                                <span className="font-medium">
+                                                    {isCNNModel ?
+                                                        (results.num_classes || results.classes?.length || 'N/A') :
+                                                        (results.features_used || 'N/A')
+                                                    }
+                                                </span>
                                             </div>
+                                            {results.total_params && (
+                                                <div className="flex justify-between">
+                                                    <span className="text-muted-foreground">Total parameters:</span>
+                                                    <span className="font-medium">{results.total_params.toLocaleString()}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
 
                                     <div>
                                         <h4 className="font-medium mb-2">Performance Indicators</h4>
                                         <div className="space-y-2">
-                                            {results.final_val_loss && results.final_loss && (
-                                                <div className={`flex items-center gap-2 ${results.final_val_loss < results.final_loss * 1.5 ? 'text-green-600' : 'text-yellow-600'}`}>
-                                                    {results.final_val_loss < results.final_loss * 1.5 ?
-                                                        <CheckCircle className="h-4 w-4" /> :
-                                                        <AlertCircle className="h-4 w-4" />
-                                                    }
-                                                    <span className="text-sm">
-                                                        {results.final_val_loss < results.final_loss * 1.5 ?
-                                                            'Good generalization (low overfitting)' :
-                                                            'Possible overfitting detected'
-                                                        }
-                                                    </span>
-                                                </div>
-                                            )}
+                                            {/* Check for overfitting using available loss metrics */}
+                                            {(results.final_val_loss !== undefined || results.val_loss !== undefined) &&
+                                                (results.final_loss !== undefined || results.loss !== undefined) && (() => {
+                                                    const valLoss = results.final_val_loss || results.val_loss;
+                                                    const trainLoss = results.final_loss || results.loss;
+                                                    const isGoodGeneralization = valLoss < trainLoss * 1.5;
+                                                    return (
+                                                        <div className={`flex items-center gap-2 ${isGoodGeneralization ? 'text-green-600' : 'text-yellow-600'}`}>
+                                                            {isGoodGeneralization ?
+                                                                <CheckCircle className="h-4 w-4" /> :
+                                                                <AlertCircle className="h-4 w-4" />
+                                                            }
+                                                            <span className="text-sm">
+                                                                {isGoodGeneralization ?
+                                                                    'Good generalization (low overfitting)' :
+                                                                    'Possible overfitting detected'
+                                                                }
+                                                            </span>
+                                                        </div>
+                                                    );
+                                                })()}
 
-                                            {results.final_mae && results.final_mae < 1000 && (
+                                            {/* Accuracy indicators for CNN models */}
+                                            {isCNNModel && (results.final_accuracy !== undefined || results.accuracy !== undefined) && (() => {
+                                                const accuracy = results.final_accuracy || results.accuracy;
+                                                return (
+                                                    <div className={`flex items-center gap-2 ${accuracy >= 0.8 ? 'text-green-600' : 'text-yellow-600'}`}>
+                                                        {accuracy >= 0.8 ?
+                                                            <CheckCircle className="h-4 w-4" /> :
+                                                            <AlertCircle className="h-4 w-4" />
+                                                        }
+                                                        <span className="text-sm">
+                                                            {accuracy >= 0.9 ? 'Excellent accuracy achieved' :
+                                                                accuracy >= 0.8 ? 'Good accuracy achieved' :
+                                                                    'Consider more training or data augmentation'
+                                                            }
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* MAE indicators for regression models */}
+                                            {!isCNNModel && results.final_mae && results.final_mae < 1000 && (
                                                 <div className="flex items-center gap-2 text-green-600">
                                                     <CheckCircle className="h-4 w-4" />
                                                     <span className="text-sm">Low mean absolute error</span>

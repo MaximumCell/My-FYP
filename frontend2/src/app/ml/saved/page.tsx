@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Download, Trash2, Eye, Calendar, Target, Gauge } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import DeleteConfirmationModal from '@/components/ui/delete-confirmation-modal';
 
 interface SavedModel {
     id: string;
     model_name: string;
-    model_type: 'classification' | 'regression';
+    model_type: 'classification' | 'regression' | 'deep-learning';
     description?: string;
     algorithm_name?: string;
     file_url: string;
@@ -46,6 +47,11 @@ export default function SavedModelsPage() {
     const [models, setModels] = useState<SavedModel[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [deleteModal, setDeleteModal] = useState<{
+        isOpen: boolean;
+        model: SavedModel | null;
+        isDeleting: boolean;
+    }>({ isOpen: false, model: null, isDeleting: false });
     const { toast } = useToast();
 
     useEffect(() => {
@@ -106,13 +112,21 @@ export default function SavedModelsPage() {
         }
     };
 
-    const handleDelete = async (model: SavedModel) => {
-        if (!confirm(`Are you sure you want to delete "${model.model_name}"? This action cannot be undone.`)) {
-            return;
-        }
+    const handleDeleteClick = (model: SavedModel) => {
+        setDeleteModal({
+            isOpen: true,
+            model,
+            isDeleting: false
+        });
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteModal.model) return;
+
+        setDeleteModal(prev => ({ ...prev, isDeleting: true }));
 
         try {
-            const response = await fetch(`http://localhost:5000/api/models/${model.id}`, {
+            const response = await fetch(`http://localhost:5000/api/models/${deleteModal.model.id}`, {
                 method: 'DELETE',
                 headers: {
                     'X-User-ID': '68d6278f394fbc66b21a8403',
@@ -122,18 +136,28 @@ export default function SavedModelsPage() {
             const result = await response.json();
 
             if (result.success) {
-                setModels(models.filter(m => m.id !== model.id));
-                toast({ title: 'Model deleted', description: `${model.model_name} has been deleted` });
+                setModels(models.filter(m => m.id !== deleteModal.model!.id));
+                toast({
+                    title: 'Model deleted successfully',
+                    description: `${deleteModal.model.model_name} has been permanently deleted`
+                });
+                setDeleteModal({ isOpen: false, model: null, isDeleting: false });
             } else {
                 throw new Error(result.error?.message || 'Delete failed');
             }
         } catch (err) {
             toast({
                 variant: 'destructive',
-                title: 'Delete failed',
-                description: err instanceof Error ? err.message : 'Unknown error'
+                title: 'Failed to delete model',
+                description: err instanceof Error ? err.message : 'An unexpected error occurred'
             });
+        } finally {
+            setDeleteModal(prev => ({ ...prev, isDeleting: false }));
         }
+    };
+
+    const handleDeleteCancel = () => {
+        setDeleteModal({ isOpen: false, model: null, isDeleting: false });
     };
 
     const formatFileSize = (bytes: number) => {
@@ -320,7 +344,7 @@ export default function SavedModelsPage() {
                                             Download
                                         </Button>
                                         <Button
-                                            onClick={() => handleDelete(model)}
+                                            onClick={() => handleDeleteClick(model)}
                                             size="sm"
                                             variant="destructive"
                                         >
@@ -333,6 +357,17 @@ export default function SavedModelsPage() {
                     })}
                 </div>
             )}
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+                isOpen={deleteModal.isOpen}
+                onClose={handleDeleteCancel}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Model"
+                description={`Are you sure you want to permanently delete "${deleteModal.model?.model_name}"?`}
+                itemName={deleteModal.model?.model_name || ''}
+                isLoading={deleteModal.isDeleting}
+            />
         </div>
     );
 }

@@ -82,19 +82,33 @@ def train_deep(model_name: str, file_storage, form: Dict[str, str]) -> Dict[str,
 
 
 def test_deep(model_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    model_name = model_name.lower()
+    # Extract actual model type from names like "deep_mlp_1758895787868"
+    original_model_name = model_name.lower()
+    
+    # Parse model type from model name
+    if 'mlp' in original_model_name or 'dense' in original_model_name:
+        model_type = 'mlp'
+    elif 'cnn' in original_model_name:
+        model_type = 'cnn'
+    elif 'sequence' in original_model_name:
+        model_type = 'sequence'
+    elif 'transformer' in original_model_name:
+        model_type = 'transformer'
+    else:
+        model_type = original_model_name
+    
     model_path = payload.get('model_path')
     if not model_path:
         # provide conventional defaults if not supplied
         model_path = payload.get('model', None)
         
         # If still no path, try to find the most recent model of this type
-        if not model_path or model_path == model_name:
+        if not model_path or model_path == original_model_name:
             trained_models_dir = os.path.join(os.getcwd(), 'trained_models')
             if os.path.exists(trained_models_dir):
                 # Look for models that match the pattern
                 import glob
-                pattern = os.path.join(trained_models_dir, f'*{model_name}*.keras')
+                pattern = os.path.join(trained_models_dir, f'*{original_model_name}*.keras')
                 matching_files = glob.glob(pattern)
                 if matching_files:
                     # Get the most recent one
@@ -107,7 +121,7 @@ def test_deep(model_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
                         model_path = max(matching_files, key=os.path.getmtime)
 
     try:
-        if model_name in ('mlp', 'dense'):
+        if model_type in ('mlp', 'dense'):
             # generic numeric predictor expects input dict
             input_dict = payload.get('input')
             if input_dict is None:
@@ -115,7 +129,7 @@ def test_deep(model_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             res = predict_generic.load_and_predict(model_path, input_dict)
             return {"predictions": res}
 
-        if model_name == 'cnn':
+        if model_type == 'cnn':
             # input should be image array or list
             image = payload.get('input')
             if image is None:
@@ -123,20 +137,20 @@ def test_deep(model_name: str, payload: Dict[str, Any]) -> Dict[str, Any]:
             res = predict_cnn.load_and_predict(model_path, image)
             return {"predictions": res}
 
-        if model_name == 'sequence':
+        if model_type == 'sequence':
             arr = payload.get('input')
             if arr is None:
                 return {"error": "Missing 'input' sequence data"}
             res = predict_sequence.load_and_predict(model_path, arr)
             return {"predictions": res}
 
-        if model_name == 'transformer':
+        if model_type == 'transformer':
             arr = payload.get('input')
             if arr is None:
                 return {"error": "Missing 'input' sequence data"}
             res = predict_transformer.load_and_predict(model_path, arr)
             return {"predictions": res}
 
-        return {"error": f"Unsupported model for testing: {model_name}"}
+        return {"error": f"Unsupported model for testing: {original_model_name} (parsed as {model_type})"}
     except Exception as e:
         return {"error": str(e)}

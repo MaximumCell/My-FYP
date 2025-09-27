@@ -30,5 +30,8 @@ node_modules
 *.sln
 *.sw?
 
-# Implementation planning
+# Implementation planning and documentation
 implementation-plan.txt
+plan.txt
+*_PLAN.md
+*_IMPLEMENTATION_PLAN.md

@@ -274,3 +274,220 @@ def download_deep_learning(model_name):
             return send_file(model_path, as_attachment=True)
     
     return jsonify({"error": "Deep learning model not found"}), 404
+
+
+# CNN Image Endpoints
+@ml_bp.route('/train/cnn-images', methods=['POST'])
+def train_cnn_images():
+    """Train CNN model with ZIP file containing images organized by classes"""
+    if 'file' not in request.files:
+        return jsonify({"error": "No ZIP file uploaded"}), 400
+    
+    file = request.files['file']
+    
+    # Validate file
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    if not file.filename.lower().endswith('.zip'):
+        return jsonify({"error": "Please upload a ZIP file"}), 400
+    
+    # Get training parameters
+    try:
+        epochs = int(request.form.get('epochs', 10))
+        batch_size = int(request.form.get('batch_size', 32))
+        target_size = request.form.get('target_size', '224,224')
+        augment = request.form.get('augment', 'true').lower() == 'true'
+        validation_split = float(request.form.get('validation_split', 0.2))
+        
+        # Parse target size
+        if isinstance(target_size, str):
+            target_size = tuple(map(int, target_size.split(',')))
+        
+        # Get optional model configuration
+        config_str = request.form.get('config', '{}')
+        config = json.loads(config_str) if config_str else {}
+        
+    except (ValueError, json.JSONDecodeError) as e:
+        return jsonify({"error": f"Invalid parameter format: {str(e)}"}), 400
+    
+    try:
+        # Import CNN image training
+        from ml.deep_learning.training.train_cnn_images import train_cnn_with_images
+        
+        # Train the model
+        result = train_cnn_with_images(
+            zip_file=file,
+            epochs=epochs,
+            batch_size=batch_size,
+            target_size=target_size,
+            augment=augment,
+            validation_split=validation_split,
+            config=config
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({"error": f"Training failed: {str(e)}"}), 500
+
+
+@ml_bp.route('/test/cnn-images', methods=['POST'])
+def test_cnn_images():
+    """Test CNN model with a single image upload"""
+    if 'file' not in request.files:
+        return jsonify({"error": "No image file uploaded"}), 400
+    
+    file = request.files['file']
+    model_name = request.form.get('model_name')
+    
+    if file.filename == '':
+        return jsonify({"error": "No file selected"}), 400
+    
+    if not model_name:
+        return jsonify({"error": "Model name is required"}), 400
+    
+    # Validate image file
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.webp'}
+    file_ext = os.path.splitext(file.filename)[1].lower()
+    
+    if file_ext not in allowed_extensions:
+        return jsonify({"error": "Please upload a valid image file"}), 400
+    
+    try:
+        # Import CNN image testing
+        from ml.deep_learning.inference.predict_cnn_images import predict_single_image
+        
+        # Make prediction
+        result = predict_single_image(
+            image_file=file,
+            model_name=model_name
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
+
+
+@ml_bp.route('/models/cnn-images', methods=['GET'])
+def get_cnn_image_models():
+    """Get list of available CNN image models"""
+    try:
+        trained_models_dir = "trained_models"
+        cnn_models = []
+        
+        if os.path.exists(trained_models_dir):
+            import glob
+            
+            # Look for CNN image models (with specific naming pattern)
+            cnn_pattern = os.path.join(trained_models_dir, "*cnn_image*.keras")
+            cnn_files = glob.glob(cnn_pattern)
+            
+            for model_path in cnn_files:
+                model_name = os.path.basename(model_path)
+                model_name = os.path.splitext(model_name)[0]  # Remove extension
+                
+                # Get model info
+                model_info = {
+                    "name": model_name,
+                    "path": model_path,
+                    "created": os.path.getctime(model_path),
+                    "size_mb": round(os.path.getsize(model_path) / (1024 * 1024), 2)
+                }
+                
+                # Try to load model metadata if available
+                metadata_path = model_path.replace('.keras', '_metadata.json')
+                if os.path.exists(metadata_path):
+                    try:
+                        with open(metadata_path, 'r') as f:
+                            metadata = json.load(f)
+                        model_info.update(metadata)
+                    except:
+                        pass
+                
+                cnn_models.append(model_info)
+        
+        # Sort by creation time (newest first)
+        cnn_models.sort(key=lambda x: x['created'], reverse=True)
+        
+        return jsonify({
+            "models": cnn_models,
+            "total": len(cnn_models)
+        })
+        
+    except Exception as e:
+        return jsonify({"error": f"Failed to list CNN models: {str(e)}"}), 500
+
+
+@ml_bp.route('/validate/zip-structure', methods=['POST'])
+def validate_zip_structure():
+    """Validate ZIP file structure for CNN image training"""
+    if 'file' not in request.files:
+        return jsonify({"error": "No ZIP file uploaded"}), 400
+    
+    file = request.files['file']
+    
+    if file.filename == '' or not file.filename.lower().endswith('.zip'):
+        return jsonify({"error": "Please upload a ZIP file"}), 400
+    
+    try:
+        # Save uploaded file temporarily
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as temp_file:
+            file.save(temp_file.name)
+            temp_zip_path = temp_file.name
+        
+        # Use image processor to validate structure
+        from utils.image_processor import extract_zip_file, validate_image_structure
+        
+        # Extract and validate
+        extracted_dir = extract_zip_file(temp_zip_path)
+        validation_result = validate_image_structure(extracted_dir)
+        
+        # Cleanup
+        os.unlink(temp_zip_path)
+        import shutil
+        if os.path.exists(extracted_dir):
+            shutil.rmtree(extracted_dir)
+        
+        return jsonify(validation_result)
+        
+    except Exception as e:
+        return jsonify({"error": f"Validation failed: {str(e)}"}), 500
+
+
+@ml_bp.route('/download/cnn-images/<model_name>', methods=['GET'])
+def download_cnn_image_model(model_name):
+    """Download CNN image model file"""
+    try:
+        trained_models_dir = "trained_models"
+        
+        # Try different possible paths
+        possible_paths = [
+            os.path.join(trained_models_dir, f"{model_name}.keras"),
+            os.path.join(trained_models_dir, f"cnn_image_{model_name}.keras"),
+            os.path.join(trained_models_dir, f"{model_name}_cnn_image.keras")
+        ]
+        
+        # Also try pattern matching
+        if os.path.exists(trained_models_dir):
+            import glob
+            pattern_paths = [
+                os.path.join(trained_models_dir, f"*{model_name}*.keras")
+            ]
+            
+            for pattern in pattern_paths:
+                matching_files = glob.glob(pattern)
+                if matching_files:
+                    possible_paths.extend(matching_files)
+        
+        # Find the first existing file
+        for model_path in possible_paths:
+            if os.path.exists(model_path):
+                return send_file(model_path, as_attachment=True)
+        
+        return jsonify({"error": "CNN image model not found"}), 404
+        
+    except Exception as e:
+        return jsonify({"error": f"Download failed: {str(e)}"}), 500

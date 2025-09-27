@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import FileUpload from '@/components/ml/file-upload';
 import api from '@/lib/api';
 import { Tooltip as RadixTooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -23,6 +24,8 @@ import { useAnalyzeData } from '@/hooks/use-ml-api';
 import DataPreview from '@/components/ml/DataPreview';
 import DeepLearningParamsEditor from '@/components/ml/DeepLearningParamsEditor';
 import EnhancedResults from '@/components/ml/EnhancedResults';
+import CNNImageUpload from '@/components/ml/CNNImageUpload';
+import CNNImageTester from '@/components/ml/CNNImageTester';
 
 export default function MlModelTypePage() {
   const [file, setFile] = useState<File | null>(null);
@@ -45,6 +48,16 @@ export default function MlModelTypePage() {
   const [useJsonEditor, setUseJsonEditor] = useState<boolean>(false);
   // Track models trained in current session
   const [sessionModels, setSessionModels] = useState<Array<{ id: string, name: string, fileName: string }>>([]);
+
+  // CNN Image specific state
+  const [isCNNImageMode, setIsCNNImageMode] = useState<boolean>(false);
+  const [cnnImageFile, setCnnImageFile] = useState<File | null>(null);
+  const [cnnValidation, setCnnValidation] = useState<any>(null);
+  const [cnnTrainResults, setCnnTrainResults] = useState<any>(null);
+
+  // Loading states for training
+  const [isTraining, setIsTraining] = useState<boolean>(false);
+  const [isCnnTraining, setIsCnnTraining] = useState<boolean>(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -110,6 +123,17 @@ export default function MlModelTypePage() {
     }
   }, []);
 
+  // Update CNN mode based on selected model
+  useEffect(() => {
+    setIsCNNImageMode(selectedModel === 'cnn');
+    // Reset CNN-specific state when switching models
+    if (selectedModel !== 'cnn') {
+      setCnnImageFile(null);
+      setCnnValidation(null);
+      setCnnTrainResults(null);
+    }
+  }, [selectedModel]);
+
   const columnsMutation = useColumns();
   const trainMutation = useTrainModel(modelType);
   const testMutation = useTestModel(modelType);
@@ -156,6 +180,9 @@ export default function MlModelTypePage() {
       toast({ variant: 'destructive', title: 'Missing file or model' });
       return;
     }
+
+    setIsTraining(true);
+
     // Build FormData as backend expects file + form fields (epochs, batch_size, config)
     const form = new FormData();
     form.append('file', file);
@@ -251,12 +278,15 @@ export default function MlModelTypePage() {
       .catch((err) => {
         const message = err?.response?.data?.error || err.message || 'Training failed';
         toast({ variant: 'destructive', title: 'Training failed', description: message });
+      })
+      .finally(() => {
+        setIsTraining(false);
       });
   };
 
   const handleTest = () => {
-    if (!selectedModel) {
-      toast({ variant: 'destructive', title: 'Missing model' });
+    if (!downloadModelName) {
+      toast({ variant: 'destructive', title: 'Please select a trained model to test' });
       return;
     }
     try {
@@ -283,7 +313,7 @@ export default function MlModelTypePage() {
       }
 
       // backend deep test endpoint
-      api.post(`/ml/deep/test`, { model: selectedModel, input })
+      api.post(`/ml/deep/test`, { model: downloadModelName, input })
         .then((res) => {
           setTestResults(res.data);
           toast({ title: 'Testing successful!' });
@@ -438,6 +468,183 @@ export default function MlModelTypePage() {
         toast({ variant: 'destructive', title: 'Failed to generate sample', description: error.error });
       }
     });
+  };
+
+  // CNN Image handlers
+  const handleCNNImageValidated = (file: File, validation: any) => {
+    setCnnImageFile(file);
+    setCnnValidation(validation);
+    setTrainResults(null);
+    setCnnTrainResults(null);
+  };
+
+  const handleCNNImageRemoved = () => {
+    setCnnImageFile(null);
+    setCnnValidation(null);
+    setCnnTrainResults(null);
+  };
+
+  const handleCNNImageTrain = async () => {
+    if (!cnnImageFile || !selectedModel) {
+      toast({ variant: 'destructive', title: 'Missing file or model' });
+      return;
+    }
+
+    setIsCnnTraining(true);
+
+    const formData = new FormData();
+    formData.append('file', cnnImageFile);
+    formData.append('epochs', String(epochs));
+    formData.append('batch_size', String(batchSize));
+    formData.append('target_size', '224,224'); // Default CNN input size
+    formData.append('augment', 'true');
+    formData.append('validation_split', '0.2');
+
+    // Add configuration if provided
+    if (configJson) {
+      formData.append('config', configJson);
+    }
+
+    try {
+      const response = await api.post('/ml/train/cnn-images', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      console.log('CNN Training Response:', response.data);
+
+      // Structure the response data to match what EnhancedResults expects
+      const structuredResults = {
+        ...response.data,
+        // Extract metrics from nested structure for EnhancedResults
+        final_accuracy: response.data.training_summary?.final_accuracy || response.data.metadata?.training_history?.final_accuracy,
+        final_val_accuracy: response.data.training_summary?.final_val_accuracy || response.data.metadata?.training_history?.final_val_accuracy,
+        final_loss: response.data.training_summary?.final_loss || response.data.metadata?.training_history?.final_loss,
+        final_val_loss: response.data.training_summary?.final_val_loss || response.data.metadata?.training_history?.final_val_loss,
+        epochs_trained: response.data.training_summary?.total_epochs || response.data.metadata?.training_history?.epochs_trained || epochs,
+        num_classes: response.data.training_summary?.num_classes,
+        total_samples: response.data.training_summary?.total_images,
+        classes: response.data.training_summary?.class_names
+      };
+
+      setCnnTrainResults(structuredResults);
+
+      // Extract model name for downloads and session tracking
+      let modelFileName = '';
+      if (response.data && (response.data.model_path || response.data.model_name || response.data.model)) {
+        const path = response.data.model_path || response.data.model_name || response.data.model;
+        try {
+          const base = String(path).split('/').pop() || '';
+          // For CNN models, use the full filename without path
+          // Remove file extension but keep the base name
+          modelFileName = base.replace(/\.(keras|pkl|h5)$/i, '');
+          setDownloadModelName(modelFileName);
+        } catch (e) {
+          modelFileName = `cnn_image_${Date.now()}`;
+        }
+      } else {
+        // If no model path returned, generate a fallback name
+        modelFileName = `cnn_image_${Date.now()}`;
+      }
+
+      // Add to session models for testing
+      const newSessionModel = {
+        id: `cnn_${Date.now()}`,
+        name: `CNN Image - ${new Date().toLocaleDateString()}`,
+        fileName: modelFileName
+      };
+      setSessionModels(prev => [...prev, newSessionModel]);
+
+      // Save CNN model to database and Cloudinary (optional - don't fail if this doesn't work)
+      if (cnnImageFile && cnnValidation && modelFileName) {
+        try {
+          console.log('Attempting to save CNN model to cloud:', modelFileName);
+          toast({ title: 'CNN Training completed! Saving model...', description: 'Your CNN model is being saved to the cloud.' });
+
+          // Create dataset info for CNN (image data) - matching SaveModelRequest interface
+          const datasetInfo = {
+            columns: ['image', 'class'], // Images and their class labels
+            target_column: 'class', // The target is the class/category
+            data_shape: {
+              rows: cnnValidation.total_images,
+              columns: 2 // image and class
+            },
+            feature_types: {
+              'image': 'image',
+              'class': 'categorical'
+            }
+          };
+
+          // Extract performance metrics from CNN training response
+          // The backend returns nested structure: training_summary and metadata.training_history
+          const trainingSummary = response.data.training_summary || {};
+          const trainingHistory = response.data.metadata?.training_history || {};
+
+          const performanceMetrics = {
+            accuracy: trainingSummary.final_accuracy || trainingHistory.final_accuracy || null,
+            val_accuracy: trainingSummary.final_val_accuracy || trainingHistory.final_val_accuracy || null,
+            loss: trainingSummary.final_loss || trainingHistory.final_loss || null,
+            val_loss: trainingSummary.final_val_loss || trainingHistory.final_val_loss || null,
+            epochs_trained: trainingSummary.total_epochs || trainingHistory.epochs_trained || epochs,
+            total_params: response.data.metadata?.training_params?.total_images || null,
+            training_time: 120.0, // Default since backend doesn't provide this
+            num_classes: trainingSummary.num_classes || null,
+            total_images: trainingSummary.total_images || null
+          };
+
+          const saveResult = await saveTrainedModel(
+            modelFileName, // The file name from training
+            {
+              modelName: `CNN Image Model - ${new Date().toLocaleDateString()}`,
+              modelType: 'deep-learning', // CNN is a type of deep learning
+              description: `Trained CNN image classification model on ${cnnImageFile.name} with ${cnnValidation.classes.length} classes`,
+              isPublic: false,
+              tags: ['cnn', 'image-classification', 'deep-learning', 'auto-saved'],
+              algorithmName: 'cnn',
+              hyperparameters: { epochs, batchSize, config: configJson, classes: cnnValidation.classes },
+              datasetInfo,
+              performanceMetrics,
+              trainingTime: performanceMetrics.training_time
+            }
+          );
+
+          if (saveResult.success) {
+            toast({
+              title: 'CNN Model saved successfully!',
+              description: 'Your trained CNN model is now available in your dashboard and can be downloaded anytime.'
+            });
+          } else {
+            console.warn('CNN Model save failed:', saveResult.error);
+            toast({
+              title: 'CNN Model trained successfully!',
+              description: 'CNN training completed but cloud save failed. You can still test and download the model.'
+            });
+          }
+        } catch (saveError) {
+          console.error('Error saving CNN model:', saveError);
+          toast({
+            title: 'CNN Model trained successfully!',
+            description: 'CNN training completed but cloud save failed. You can still test and download the model.'
+          });
+        }
+      }
+
+      toast({
+        title: 'CNN training successful!',
+        description: `Model trained on ${cnnValidation.total_images} images from ${cnnValidation.classes.length} classes.`
+      });
+
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || 'CNN training failed';
+      toast({
+        variant: 'destructive',
+        title: 'CNN training failed',
+        description: errorMessage,
+      });
+    } finally {
+      setIsCnnTraining(false);
+    }
   }; return (
     <div>
       <div className="text-center mb-12">
@@ -457,10 +664,44 @@ export default function MlModelTypePage() {
               <CardHeader className="p-0 mb-4">
                 <CardTitle>Train a Deep Learning Model</CardTitle>
                 <CardDescription>
-                  Upload your dataset and configure neural network parameters. Deep learning works best with larger datasets (1000+ samples).
+                  {!isCNNImageMode
+                    ? "Upload your dataset and configure neural network parameters. Deep learning works best with larger datasets (1000+ samples)."
+                    : "Upload a ZIP file containing your images organized by class folders for CNN training."
+                  }
                 </CardDescription>
               </CardHeader>
-              <FileUpload onFileChange={handleFileChange} />
+
+              {/* Model Selection - Show First */}
+              <div className="mb-6">
+                <Label htmlFor="model-select-main">Select Model Type</Label>
+                <Select value={selectedModel} onValueChange={setSelectedModel}>
+                  <SelectTrigger id="model-select-main">
+                    <SelectValue placeholder={modelsLoading ? "Loading..." : "Select a model type"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {models?.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                {!selectedModel && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Choose a model type first. Select "cnn" for image classification with ZIP files.
+                  </p>
+                )}
+              </div>
+
+              {/* File Upload - Changes based on model type */}
+              {selectedModel && (
+                <>
+                  {!isCNNImageMode ? (
+                    <FileUpload onFileChange={handleFileChange} />
+                  ) : (
+                    <CNNImageUpload
+                      onFileValidated={handleCNNImageValidated}
+                      onFileRemoved={handleCNNImageRemoved}
+                    />
+                  )}
+                </>
+              )}
 
               {/* Data Preview */}
               {showDataPreview && dataAnalysis && (
@@ -469,33 +710,38 @@ export default function MlModelTypePage() {
                 </div>
               )}
 
-              {file && (
+              {((file && !isCNNImageMode) || (cnnImageFile && isCNNImageMode)) && (
                 <div className="mt-4 space-y-4">
-                  <p className="text-sm">File: <span className="font-medium text-primary">{file.name}</span></p>
+                  <p className="text-sm">File: <span className="font-medium text-primary">
+                    {isCNNImageMode ? cnnImageFile?.name : file?.name}
+                  </span></p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="model-select">Model</Label>
-                      <Select value={selectedModel} onValueChange={setSelectedModel}>
-                        <SelectTrigger id="model-select">
-                          <SelectValue placeholder={modelsLoading ? "Loading..." : "Select a model"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {models?.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="target-select">Target Column</Label>
-                      <Select value={targetColumn} onValueChange={setTargetColumn} disabled={columnsMutation.isPending || columns.length === 0}>
-                        <SelectTrigger id="target-select" disabled={columnsMutation.isPending || columns.length === 0}>
-                          <SelectValue placeholder={columnsMutation.isPending ? "Loading columns..." : "Select target"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {!isCNNImageMode && (
+                      <div>
+                        <Label htmlFor="target-select">Target Column</Label>
+                        <Select value={targetColumn} onValueChange={setTargetColumn} disabled={columnsMutation.isPending || columns.length === 0}>
+                          <SelectTrigger id="target-select" disabled={columnsMutation.isPending || columns.length === 0}>
+                            <SelectValue placeholder={columnsMutation.isPending ? "Loading columns..." : "Select target"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    {isCNNImageMode && cnnValidation && (
+                      <div>
+                        <Label>Classes Detected</Label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {cnnValidation.classes.map((className: string) => (
+                            <Badge key={className} variant="outline">
+                              {className} ({cnnValidation.class_counts[className]})
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-4">
@@ -529,145 +775,176 @@ export default function MlModelTypePage() {
 
                   <div className="mt-4 space-y-2">
                     <Button
-                      onClick={handleTrain}
-                      disabled={trainMutation.isPending || !selectedModel || !targetColumn}
+                      onClick={isCNNImageMode ? handleCNNImageTrain : handleTrain}
+                      disabled={
+                        (isCNNImageMode ? isCnnTraining : isTraining) ||
+                        !selectedModel ||
+                        (isCNNImageMode ? !cnnImageFile || !cnnValidation?.valid : !targetColumn)
+                      }
                       className="w-full md:w-auto"
                     >
-                      {trainMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Train Deep Learning Model
+                      {(isCNNImageMode ? isCnnTraining : isTraining) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Train {isCNNImageMode ? 'CNN Image' : 'Deep Learning'} Model
                     </Button>
-                    {(!selectedModel || !targetColumn) && (
+                    {(!selectedModel || (isCNNImageMode ? (!cnnImageFile || !cnnValidation?.valid) : !targetColumn)) && (
                       <p className="text-sm text-muted-foreground">
-                        Please select a model and target column before training.
+                        {isCNNImageMode
+                          ? "Please select a model and upload a valid ZIP file before training."
+                          : "Please select a model and target column before training."
+                        }
                       </p>
                     )}
                   </div>
                 </div>
               )}
-              {trainResults && (
+              {(trainResults || cnnTrainResults) && (
                 <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-4">Training Results</h3>
-                  <EnhancedResults results={trainResults} modelType="deep-learning" />
+                  <h3 className="text-lg font-semibold mb-4">
+                    {isCNNImageMode ? 'CNN Image Training Results' : 'Training Results'}
+                  </h3>
+                  <EnhancedResults
+                    results={isCNNImageMode ? cnnTrainResults : trainResults}
+                    modelType="deep-learning"
+                  />
                 </div>
               )}
             </TabsContent>
             <TabsContent value="test">
               <CardHeader className="p-0 mb-4">
                 <CardTitle>Test an Existing Model</CardTitle>
-                <CardDescription>Provide a model name and new data to get predictions.</CardDescription>
+                <CardDescription>
+                  {selectedModel === 'cnn'
+                    ? "Upload a single image to test with your trained CNN model."
+                    : "Provide a model name and new data to get predictions."
+                  }
+                </CardDescription>
               </CardHeader>
-              <div className="mt-4 space-y-4">
-                {file && (
-                  <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="text-sm">
-                      <span className="font-medium">Training file loaded:</span> {file.name}
-                      {targetColumn && (
-                        <span className="ml-2 text-muted-foreground">
-                          (Target: <span className="font-medium">{targetColumn}</span>)
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Feature fields are automatically generated from your training data
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <Label htmlFor="model-select-test">Model</Label>
-                  <Select value={selectedModel} onValueChange={setSelectedModel}>
-                    <SelectTrigger id="model-select-test">
-                      <SelectValue placeholder={sessionModels.length ? "Select one of your trained models" : "No models trained in this session"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {sessionModels.map((model) => <SelectItem key={model.id} value={model.fileName}>{model.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {sessionModels.length === 0 && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      You haven't trained any deep learning models in this session yet. Go to the "Train Models" tab to get started.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="test-data">New Data</Label>
-                    <div className="flex items-center gap-2">
-                      <input id="use-json" type="checkbox" checked={useJsonEditor} onChange={(e) => setUseJsonEditor(e.target.checked)} />
-                      <Label htmlFor="use-json" className="text-sm">Use raw JSON</Label>
-                    </div>
-                  </div>
 
-                  {columns.length > 0 && !useJsonEditor ? (
-                    <div className="space-y-3 mt-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-sm font-medium">Feature Values</Label>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleGenerateSampleInput}
-                          disabled={sampleInputMutation.isPending || !file}
-                        >
-                          {sampleInputMutation.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-                          Generate Sample
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {Object.keys(featureInputs).length === 0 && (
-                          <p className="text-sm text-muted-foreground">No feature inputs detected. Upload a CSV and select target to generate fields.</p>
+              {/* Show model selection reminder if no model selected */}
+              {!selectedModel && (
+                <div className="p-4 border-2 border-dashed border-muted-foreground/25 rounded-lg text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Please select a model type in the Train tab first to begin testing.
+                  </p>
+                </div>
+              )}
+
+              {selectedModel === 'cnn' ? (
+                <CNNImageTester />
+              ) : selectedModel ? (
+                <div className="mt-4 space-y-4">
+                  {file && (
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-sm">
+                        <span className="font-medium">Training file loaded:</span> {file.name}
+                        {targetColumn && (
+                          <span className="ml-2 text-muted-foreground">
+                            (Target: <span className="font-medium">{targetColumn}</span>)
+                          </span>
                         )}
-                        {Object.entries(featureInputs).map(([k, v]) => (
-                          <div key={k}>
-                            <Label className="text-xs">{k}</Label>
-                            <Input value={v} onChange={(e) => setFeatureInputs(prev => ({ ...prev, [k]: e.target.value }))} placeholder={`Enter value for ${k}`} />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-2 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="test-data-json" className="text-xs">JSON Object (single object or array with one object)</Label>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleGenerateSampleInput}
-                          disabled={sampleInputMutation.isPending || !file}
-                        >
-                          {sampleInputMutation.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
-                          Generate Sample
-                        </Button>
-                      </div>
-                      <Textarea
-                        id="test-data-json"
-                        value={testJson}
-                        onChange={(e) => setTestJson(e.target.value)}
-                        rows={10}
-                        className="font-mono text-sm"
-                        placeholder="Enter your test data as JSON object"
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        Example: {JSON.stringify({ feature1: 0, feature2: 1 })}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Feature fields are automatically generated from your training data
                       </p>
                     </div>
                   )}
+                  <div>
+                    <Label htmlFor="model-select-test">Trained Model</Label>
+                    <Select value={downloadModelName} onValueChange={setDownloadModelName}>
+                      <SelectTrigger id="model-select-test">
+                        <SelectValue placeholder={sessionModels.length ? "Select one of your trained models" : "No models trained in this session"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sessionModels.map((model) => <SelectItem key={model.id} value={model.fileName}>{model.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    {sessionModels.length === 0 && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        You haven't trained any deep learning models in this session yet. Go to the "Train Models" tab to get started.
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="test-data">New Data</Label>
+                      <div className="flex items-center gap-2">
+                        <input id="use-json" type="checkbox" checked={useJsonEditor} onChange={(e) => setUseJsonEditor(e.target.checked)} />
+                        <Label htmlFor="use-json" className="text-sm">Use raw JSON</Label>
+                      </div>
+                    </div>
 
-                  <Button
-                    onClick={handleTest}
-                    disabled={testMutation.isPending || !selectedModel || sessionModels.length === 0}
-                    className="mt-4"
-                  >
-                    {testMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Test Model
-                  </Button>
+                    {columns.length > 0 && !useJsonEditor ? (
+                      <div className="space-y-3 mt-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm font-medium">Feature Values</Label>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleGenerateSampleInput}
+                            disabled={sampleInputMutation.isPending || !file}
+                          >
+                            {sampleInputMutation.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                            Generate Sample
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {Object.keys(featureInputs).length === 0 && (
+                            <p className="text-sm text-muted-foreground">No feature inputs detected. Upload a CSV and select target to generate fields.</p>
+                          )}
+                          {Object.entries(featureInputs).map(([k, v]) => (
+                            <div key={k}>
+                              <Label className="text-xs">{k}</Label>
+                              <Input value={v} onChange={(e) => setFeatureInputs(prev => ({ ...prev, [k]: e.target.value }))} placeholder={`Enter value for ${k}`} />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="mt-2 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="test-data-json" className="text-xs">JSON Object (single object or array with one object)</Label>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleGenerateSampleInput}
+                            disabled={sampleInputMutation.isPending || !file}
+                          >
+                            {sampleInputMutation.isPending && <Loader2 className="mr-2 h-3 w-3 animate-spin" />}
+                            Generate Sample
+                          </Button>
+                        </div>
+                        <Textarea
+                          id="test-data-json"
+                          value={testJson}
+                          onChange={(e) => setTestJson(e.target.value)}
+                          rows={10}
+                          className="font-mono text-sm"
+                          placeholder="Enter your test data as JSON object"
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          Example: {JSON.stringify({ feature1: 0, feature2: 1 })}
+                        </p>
+                      </div>
+                    )}
+
+                    <Button
+                      onClick={handleTest}
+                      disabled={testMutation.isPending || !downloadModelName || sessionModels.length === 0}
+                      className="mt-4"
+                    >
+                      {testMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Test Model
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              ) : null}
               {testResults && (
                 <div className="mt-6">
                   <h3 className="text-lg font-semibold">Test Results</h3>
                   <Card className="mt-2">
                     <CardHeader>
                       <CardTitle>Deep Learning Prediction</CardTitle>
-                      <CardDescription>Model: <span className="font-medium">{selectedModel}</span></CardDescription>
+                      <CardDescription>Model: <span className="font-medium">{downloadModelName}</span></CardDescription>
                     </CardHeader>
                     <CardContent>
                       {Array.isArray(testResults.predictions) ? (
