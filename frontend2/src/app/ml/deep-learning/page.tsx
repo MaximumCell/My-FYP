@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useModels, useColumns, useTrainModel, useTestModel, useRecommendModel, useSampleInput } from '@/hooks/use-ml-api';
 import type { ApiError, ModelType, TrainResponse } from '@/types/api';
+import { saveTrainedModel, extractPerformanceMetrics, createDatasetInfo } from '@/lib/model-storage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,6 +43,8 @@ export default function MlModelTypePage() {
   const [showDataPreview, setShowDataPreview] = useState<boolean>(false);
   const [featureInputs, setFeatureInputs] = useState<Record<string, string>>({});
   const [useJsonEditor, setUseJsonEditor] = useState<boolean>(false);
+  // Track models trained in current session
+  const [sessionModels, setSessionModels] = useState<Array<{ id: string, name: string, fileName: string }>>([]);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -164,8 +167,84 @@ export default function MlModelTypePage() {
 
     // Use backend deep train endpoint
     api.post(`/ml/deep/train`, form, { headers: { 'Content-Type': 'multipart/form-data' } })
-      .then((res) => {
+      .then(async (res) => {
         setTrainResults(res.data);
+
+        // Extract model name for downloads and session tracking
+        let modelFileName = '';
+        if (res.data && (res.data.model_path || res.data.model)) {
+          const path = res.data.model_path || res.data.model;
+          try {
+            const base = String(path).split('/').pop() || '';
+            // For deep learning models, use the full filename without path
+            // Remove file extension but keep the base name
+            modelFileName = base.replace(/\.(keras|pkl)$/i, '');
+            setDownloadModelName(modelFileName);
+          } catch (e) {
+            modelFileName = `${selectedModel}_${Date.now()}`;
+          }
+        } else {
+          // If no model path returned, generate a fallback name
+          modelFileName = `${selectedModel}_${Date.now()}`;
+        }
+
+        // Add the newly trained model to session models for testing and downloading
+        const newSessionModel = {
+          id: `${selectedModel}_${Date.now()}`, // Unique ID for React keys
+          name: `${selectedModel} - ${new Date().toLocaleDateString()}`,
+          fileName: modelFileName
+        };
+        setSessionModels(prev => [...prev, newSessionModel]);
+
+        // Save model to database and Cloudinary (optional - don't fail if this doesn't work)
+        if (file && targetColumn && modelFileName) {
+          try {
+            console.log('Attempting to save model to cloud:', modelFileName);
+            toast({ title: 'Training completed! Saving model...', description: 'Your model is being saved to the cloud.' });
+
+            const datasetInfo = await createDatasetInfo(file, columns, targetColumn);
+            // Create performance metrics for deep learning models
+            const performanceMetrics = extractPerformanceMetrics(res.data, 'deep-learning'); // Deep learning metrics
+
+            const saveResult = await saveTrainedModel(
+              modelFileName, // The file name from training
+              {
+                modelName: `${selectedModel} - ${new Date().toLocaleDateString()}`,
+                modelType: 'deep-learning', // Deep learning models
+                description: `Trained ${selectedModel} deep learning model on ${file.name}`,
+                isPublic: false,
+                tags: [selectedModel, 'deep-learning', 'auto-saved'],
+                algorithmName: selectedModel,
+                hyperparameters: { epochs, batchSize, config: configJson },
+                datasetInfo,
+                performanceMetrics,
+                trainingTime: 120.0 // Default training time in seconds for deep learning
+              }
+            );
+
+            if (saveResult.success) {
+              toast({
+                title: 'Model saved successfully!',
+                description: 'Your trained model is now available in your dashboard and can be downloaded anytime.'
+              });
+            } else {
+              console.warn('Model save failed:', saveResult.error);
+              toast({
+                title: 'Model trained successfully!',
+                description: 'Model training completed but cloud save failed. You can still test and download the model.'
+              });
+            }
+          } catch (saveError) {
+            console.error('Error saving model:', saveError);
+            toast({
+              title: 'Model trained successfully!',
+              description: 'Model training completed but cloud save failed. You can still test and download the model.'
+            });
+          }
+        } else {
+          console.warn('Skipping cloud save - missing required data:', { file: !!file, targetColumn, modelFileName });
+        }
+
         toast({ title: 'Training successful!', description: res.data.message || 'Deep model trained' });
         fetchDeepModels();
       })
@@ -497,12 +576,17 @@ export default function MlModelTypePage() {
                   <Label htmlFor="model-select-test">Model</Label>
                   <Select value={selectedModel} onValueChange={setSelectedModel}>
                     <SelectTrigger id="model-select-test">
-                      <SelectValue placeholder={modelsLoading ? "Loading..." : "Select a model to test"} />
+                      <SelectValue placeholder={sessionModels.length ? "Select one of your trained models" : "No models trained in this session"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {models?.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      {sessionModels.map((model) => <SelectItem key={model.id} value={model.fileName}>{model.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {sessionModels.length === 0 && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      You haven't trained any deep learning models in this session yet. Go to the "Train Models" tab to get started.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
@@ -567,7 +651,11 @@ export default function MlModelTypePage() {
                     </div>
                   )}
 
-                  <Button onClick={handleTest} disabled={testMutation.isPending} className="mt-4">
+                  <Button
+                    onClick={handleTest}
+                    disabled={testMutation.isPending || !selectedModel || sessionModels.length === 0}
+                    className="mt-4"
+                  >
                     {testMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Test Model
                   </Button>
@@ -668,11 +756,28 @@ export default function MlModelTypePage() {
               </CardHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="model-name-download">Model Name</Label>
-                  <Input id="model-name-download" value={downloadModelName} onChange={(e) => setDownloadModelName(e.target.value)} placeholder="e.g., cnn_1678886400" />
+                  <Label htmlFor="model-select-download">Your Trained Models</Label>
+                  <Select value={downloadModelName} onValueChange={setDownloadModelName}>
+                    <SelectTrigger id="model-select-download">
+                      <SelectValue placeholder={sessionModels.length ? "Select a model to download" : "No models trained in this session"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sessionModels.map((model) => <SelectItem key={model.id} value={model.fileName}>{model.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {sessionModels.length === 0 && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      You haven't trained any deep learning models in this session yet. Go to the "Train Models" tab to get started.
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-4">
-                  <Button onClick={() => handleDownload(modelType)}>Download Deep Learning Model</Button>
+                  <Button
+                    onClick={() => handleDownload(modelType)}
+                    disabled={!downloadModelName || sessionModels.length === 0}
+                  >
+                    Download Deep Learning Model
+                  </Button>
                 </div>
               </div>
             </TabsContent>

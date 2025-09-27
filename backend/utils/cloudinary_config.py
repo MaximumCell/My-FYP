@@ -27,9 +27,9 @@ cloudinary.config(
 # Constants
 MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', 52428800))  # 50MB default
 ALLOWED_FILE_TYPES = {
-    'models': ['pkl'],
+    'models': ['pkl', 'keras', 'h5'],
     'simulations': ['html', 'png'],
-    'general': ['pkl', 'html', 'png']
+    'general': ['pkl', 'keras', 'h5', 'html', 'png']
 }
 
 # Configure logging

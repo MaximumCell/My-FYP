@@ -240,3 +240,37 @@ def deep_test():
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": f"Internal Server Error: {str(e)}"}), 500
+
+
+@ml_bp.route('/download/deep-learning/<model_name>', methods=['GET'])
+def download_deep_learning(model_name):
+    # Deep learning models can be .keras or .pkl files
+    # Try different possible paths and extensions
+    possible_paths = [
+        f"trained_models/{model_name}.keras",
+        f"trained_models/{model_name}.pkl",
+        f"trained_models/{model_name}_pipeline.pkl",
+        f"trained_models/deep_mlp_{model_name}.keras"
+    ]
+    
+    # Also try to find the model by pattern if exact name doesn't work
+    trained_models_dir = "trained_models"
+    if os.path.exists(trained_models_dir):
+        import glob
+        # Look for files containing the model name
+        pattern_paths = [
+            f"trained_models/*{model_name}*.keras",
+            f"trained_models/*{model_name}*.pkl"
+        ]
+        for pattern in pattern_paths:
+            matching_files = glob.glob(pattern)
+            if matching_files:
+                # Get the most recent one
+                possible_paths.extend(matching_files)
+    
+    # Try each possible path
+    for model_path in possible_paths:
+        if os.path.exists(model_path):
+            return send_file(model_path, as_attachment=True)
+    
+    return jsonify({"error": "Deep learning model not found"}), 404

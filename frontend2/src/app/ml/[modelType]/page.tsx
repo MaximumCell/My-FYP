@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useModels, useColumns, useTrainModel, useTestModel, useRecommendModel, useAnalyzeData, useSampleInput } from '@/hooks/use-ml-api';
 import type { ApiError, ModelType, TrainResponse } from '@/types/api';
+import { saveTrainedModel, extractPerformanceMetrics, createDatasetInfo } from '@/lib/model-storage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -55,6 +56,8 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
   const [downloadModelName, setDownloadModelName] = useState('');
   const [dataAnalysis, setDataAnalysis] = useState<any>(null);
   const [showDataPreview, setShowDataPreview] = useState<boolean>(false);
+  // Track models trained in current session
+  const [sessionModels, setSessionModels] = useState<Array<{ id: string, name: string, fileName: string }>>([]);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -66,7 +69,16 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
     if (!selectedModel && models && models.length > 0) {
       setSelectedModel(models[0]);
     }
-  }, [models]);
+  }, [models, selectedModel]);
+
+  // When session models change, pre-select the latest one for testing
+  useEffect(() => {
+    if (sessionModels.length > 0) {
+      const latestModel = sessionModels[sessionModels.length - 1];
+      setSelectedModel(latestModel.fileName);
+      setDownloadModelName(latestModel.fileName);
+    }
+  }, [sessionModels]);
 
   // Initialize feature inputs when columns are available
   useEffect(() => {
@@ -176,20 +188,81 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
     trainMutation.mutate(
       { file, model: selectedModel, target_column: targetColumn || undefined, test_size: testSize, scaling_method: scalingMethod, hyperparams },
       {
-        onSuccess: (data) => {
+        onSuccess: async (data) => {
           setTrainResults(data);
-          // If backend returned a model path, extract a sensible model name for downloads
+
+          // Extract model name for downloads
+          let modelFileName = '';
           if (data && (data.model_path || data.model)) {
             const path = data.model_path || data.model;
             try {
               const base = String(path).split('/').pop() || '';
-              // remove common suffixes used by backend
-              const name = base.replace(/(_classifier_pipeline|_pipeline)?\.pkl$/i, '');
-              setDownloadModelName(name);
+              modelFileName = base.replace(/(_classifier_pipeline|_pipeline)?\.pkl$/i, '');
+              setDownloadModelName(modelFileName);
             } catch (e) {
-              // ignore
+              modelFileName = `${selectedModel}_${Date.now()}`;
             }
           }
+
+          // Add the newly trained model to session models for testing and downloading
+          const newSessionModel = {
+            id: `${selectedModel}_${Date.now()}`, // Unique ID for React keys
+            name: `${selectedModel} - ${new Date().toLocaleDateString()}`,
+            fileName: modelFileName
+          };
+          setSessionModels(prev => [...prev, newSessionModel]);
+
+          // Save model to database and Cloudinary (optional - don't fail if this doesn't work)
+          if (file && targetColumn && modelFileName) {
+            try {
+              console.log('Attempting to save model to cloud:', modelFileName);
+              toast({ title: 'Training completed! Saving model...', description: 'Your model is being saved to the cloud.' });
+
+              const datasetInfo = await createDatasetInfo(file, columns, targetColumn);
+              // Only save models for regression and classification
+              if (modelType === 'regression' || modelType === 'classification') {
+                const performanceMetrics = extractPerformanceMetrics(data, modelType);
+
+                const saveResult = await saveTrainedModel(
+                  modelFileName, // The file name from training
+                  {
+                    modelName: `${selectedModel} - ${new Date().toLocaleDateString()}`,
+                    modelType: modelType,
+                    description: `Trained ${selectedModel} model on ${file.name}`,
+                    isPublic: false,
+                    tags: [selectedModel, modelType, 'auto-saved'],
+                    algorithmName: selectedModel,
+                    hyperparameters: hyperparams,
+                    datasetInfo,
+                    performanceMetrics,
+                    trainingTime: 60.0 // Default training time in seconds (will be replaced with actual timing later)
+                  }
+                );
+
+                if (saveResult.success) {
+                  toast({
+                    title: 'Model saved successfully!',
+                    description: 'Your trained model is now available in your dashboard and can be downloaded anytime.'
+                  });
+                } else {
+                  console.warn('Model save failed:', saveResult.error);
+                  toast({
+                    title: 'Model trained successfully!',
+                    description: 'Model training completed but cloud save failed. You can still test and download the model.'
+                  });
+                }
+              }
+            } catch (saveError) {
+              console.error('Error saving model:', saveError);
+              toast({
+                title: 'Model trained successfully!',
+                description: 'Model training completed but cloud save failed. You can still test and download the model.'
+              });
+            }
+          } else {
+            console.warn('Skipping cloud save - missing required data:', { file: !!file, targetColumn, modelFileName });
+          }
+
           // refresh models list so UI shows newly trained models
           queryClient.invalidateQueries({ queryKey: ['models', modelType] });
           toast({ title: 'Training successful!', description: data.message });
@@ -473,7 +546,7 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
             </TabsContent>
             <TabsContent value="test">
               <CardHeader className="p-0 mb-4">
-                <CardTitle>Test an Existing Model</CardTitle>
+                <CardTitle>Test Model</CardTitle>
                 <CardDescription>Provide a model name and new data to get predictions.</CardDescription>
               </CardHeader>
               <div className="mt-4 space-y-4">
@@ -481,12 +554,17 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
                   <Label htmlFor="model-select-test">Model</Label>
                   <Select value={selectedModel} onValueChange={setSelectedModel}>
                     <SelectTrigger id="model-select-test">
-                      <SelectValue placeholder={modelsLoading ? "Loading..." : "Select a model to test"} />
+                      <SelectValue placeholder={sessionModels.length ? "Select one of your trained models" : "No models trained in this session"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {models?.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                      {sessionModels.map((model) => <SelectItem key={model.id} value={model.fileName}>{model.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {sessionModels.length === 0 && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      You haven't trained any {modelType} models in this session yet. Go to the "Train Models" tab to get started.
+                    </p>
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
@@ -517,7 +595,11 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
                     </div>
                   )}
 
-                  <Button onClick={handleTest} disabled={testMutation.isPending} className="mt-4">
+                  <Button
+                    onClick={handleTest}
+                    disabled={testMutation.isPending || !selectedModel || sessionModels.length === 0}
+                    className="mt-4"
+                  >
                     {testMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Test Model
                   </Button>
@@ -612,15 +694,32 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
             <TabsContent value="download">
               <CardHeader className="p-0 mb-4">
                 <CardTitle>Download a Trained Model</CardTitle>
-                <CardDescription>Enter the name of a trained model to download it as a .pkl file.</CardDescription>
+                <CardDescription>Select one of your trained models to download as a .pkl file.</CardDescription>
               </CardHeader>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="model-name-download">Model Name</Label>
-                  <Input id="model-name-download" value={downloadModelName} onChange={(e) => setDownloadModelName(e.target.value)} placeholder="e.g., linear_regression_1678886400" />
+                  <Label htmlFor="model-select-download">Your Trained Models</Label>
+                  <Select value={downloadModelName} onValueChange={setDownloadModelName}>
+                    <SelectTrigger id="model-select-download">
+                      <SelectValue placeholder={sessionModels.length ? "Select a model to download" : "No models trained in this session"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sessionModels.map((model) => <SelectItem key={model.id} value={model.fileName}>{model.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {sessionModels.length === 0 && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      You haven't trained any {modelType} models in this session yet. Go to the "Train Models" tab to get started.
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-4">
-                  <Button onClick={() => handleDownload(modelType)}>Download {capitalizeFirstLetter(modelType)} Model</Button>
+                  <Button
+                    onClick={() => handleDownload(modelType)}
+                    disabled={!downloadModelName || sessionModels.length === 0}
+                  >
+                    Download {capitalizeFirstLetter(modelType)} Model
+                  </Button>
                 </div>
               </div>
             </TabsContent>

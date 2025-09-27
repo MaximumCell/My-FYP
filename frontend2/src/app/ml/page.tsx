@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, FunctionSquare, Pilcrow, BrainCircuit } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ArrowRight, FunctionSquare, Pilcrow, BrainCircuit, Save } from 'lucide-react';
 import Image from 'next/image';
 
 const modelTypes = [
@@ -37,6 +38,14 @@ export default function MlPage() {
       <div className="text-center mb-12">
         <h1 className="text-4xl font-headline font-bold">Machine Learning Lab</h1>
         <p className="text-muted-foreground mt-2">Choose a model type to get started.</p>
+        <div className="mt-6">
+          <Button asChild variant="outline">
+            <Link href="/ml/saved">
+              <Save className="mr-2 h-4 w-4" />
+              View Saved Models
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -66,8 +75,8 @@ export default function MlPage() {
               <Link
                 href={model.disabled ? '#' : model.link}
                 className={`flex items-center justify-between w-full p-3 rounded-lg text-sm font-semibold transition-all duration-300 ${model.disabled
-                    ? 'text-muted-foreground bg-muted/30'
-                    : 'text-primary hover:bg-primary hover:text-primary-foreground group-hover:shadow-md'
+                  ? 'text-muted-foreground bg-muted/30'
+                  : 'text-primary hover:bg-primary hover:text-primary-foreground group-hover:shadow-md'
                   }`}
               >
                 <span>{model.disabled ? 'Coming Soon' : `Go to ${model.name}`}</span>

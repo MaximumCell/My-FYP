@@ -57,9 +57,11 @@ def validate_model_file(file):
     if file.filename == '':
         raise ValueError("No file selected")
     
-    # Check file extension
-    if not file.filename.lower().endswith('.pkl'):
-        raise ValueError("Only .pkl files are allowed for model upload")
+    # Check file extension - allow both .pkl and .keras files
+    allowed_extensions = ['.pkl', '.keras', '.h5']
+    filename_lower = file.filename.lower()
+    if not any(filename_lower.endswith(ext) for ext in allowed_extensions):
+        raise ValueError(f"Only {', '.join(allowed_extensions)} files are allowed for model upload")
     
     return True
 
