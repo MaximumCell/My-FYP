@@ -1,6 +1,6 @@
 """
-Cloudinary File Upload Manager
-Handles file uploads to Cloudinary with proper error handling and folder structure
+Cloudinary File Upload Manager with Retry Logic
+Handles file uploads to Cloudinary with proper error handling, retry mechanisms and folder structure
 """
 
 import os
@@ -9,6 +9,7 @@ import cloudinary.api
 from typing import Optional, Dict, Any, Union, BinaryIO, List
 import logging
 from .cloudinary_config import CloudinaryConfig, ALLOWED_FILE_TYPES, MAX_FILE_SIZE
+from .retry_mechanisms import retry_cloudinary_operation, cloudinary_circuit_breaker
 import tempfile
 import time
 
@@ -26,6 +27,8 @@ class CloudinaryUploadManager:
     def __init__(self):
         self.config = CloudinaryConfig()
     
+    @retry_cloudinary_operation(max_attempts=3)
+    @cloudinary_circuit_breaker
     def upload_model_file(
         self, 
         file_data: Union[bytes, BinaryIO], 
@@ -34,7 +37,7 @@ class CloudinaryUploadManager:
         model_name: str
     ) -> Dict[str, Any]:
         """
-        Upload ML model file (.pkl) to Cloudinary
+        Upload ML model file (.pkl) to Cloudinary with retry logic
         
         Args:
             file_data: File data (bytes or file-like object)
@@ -45,6 +48,8 @@ class CloudinaryUploadManager:
         Returns:
             Dictionary containing upload results and metadata
         """
+        temp_file_path = None
+        
         try:
             # Validate file
             if isinstance(file_data, bytes):
@@ -67,42 +72,48 @@ class CloudinaryUploadManager:
                 temp_file.write(file_bytes)
                 temp_file_path = temp_file.name
             
-            try:
-                # Upload to Cloudinary
-                upload_result = cloudinary.uploader.upload(
-                    temp_file_path,
-                    public_id=public_id,
-                    resource_type="raw",  # For non-image files
-                    overwrite=False,  # Don't overwrite existing files
-                    use_filename=False,  # Use our generated public_id
-                    tags=["model", f"user_{user_id}", "pkl"]
-                )
+            # Upload to Cloudinary with enhanced configuration
+            upload_result = cloudinary.uploader.upload(
+                temp_file_path,
+                public_id=public_id,
+                resource_type="raw",  # For non-image files
+                overwrite=False,  # Don't overwrite existing files
+                use_filename=False,  # Use our generated public_id
+                tags=["model", f"user_{user_id}", "pkl"],
+                timeout=60,  # 60 second timeout
+                chunk_size=6000000,  # 6MB chunks for large files
+                eager_async=False  # Wait for upload to complete
+            )
+            
+            logger.info(f"Model uploaded successfully: {public_id}")
+            
+            return {
+                'success': True,
+                'public_id': upload_result['public_id'],
+                'secure_url': upload_result['secure_url'],
+                'file_size': upload_result['bytes'],
+                'resource_type': upload_result['resource_type'],
+                'created_at': upload_result['created_at'],
+                'version': upload_result['version'],
+                'format': upload_result.get('format', 'pkl'),
+                'tags': upload_result.get('tags', [])
+            }
                 
-                logger.info(f"Model uploaded successfully: {public_id}")
-                
-                return {
-                    'success': True,
-                    'public_id': upload_result['public_id'],
-                    'secure_url': upload_result['secure_url'],
-                    'file_size': upload_result['bytes'],
-                    'resource_type': upload_result['resource_type'],
-                    'created_at': upload_result['created_at'],
-                    'version': upload_result['version'],
-                    'format': upload_result.get('format', 'pkl'),
-                    'tags': upload_result.get('tags', [])
-                }
-                
-            finally:
-                # Clean up temporary file
-                if os.path.exists(temp_file_path):
-                    os.unlink(temp_file_path)
-                    
         except CloudinaryUploadError:
             raise
         except Exception as e:
             logger.error(f"Model upload failed: {str(e)}")
             raise CloudinaryUploadError(f"Upload failed: {str(e)}")
+        finally:
+            # Clean up temporary file
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp file {temp_file_path}: {str(e)}")
     
+    @retry_cloudinary_operation(max_attempts=3)
+    @cloudinary_circuit_breaker
     def upload_simulation_file(
         self, 
         file_data: Union[bytes, str], 
@@ -112,7 +123,7 @@ class CloudinaryUploadManager:
         file_type: str = 'html'
     ) -> Dict[str, Any]:
         """
-        Upload simulation file (.html or .png) to Cloudinary
+        Upload simulation file (.html or .png) to Cloudinary with retry logic
         
         Args:
             file_data: File data (bytes for binary files, str for HTML)
@@ -124,6 +135,8 @@ class CloudinaryUploadManager:
         Returns:
             Dictionary containing upload results and metadata
         """
+        temp_file_path = None
+        
         try:
             # Convert string to bytes if needed (for HTML content)
             if isinstance(file_data, str):
@@ -158,41 +171,45 @@ class CloudinaryUploadManager:
                 temp_file.write(file_bytes)
                 temp_file_path = temp_file.name
             
-            try:
-                # Upload to Cloudinary
-                upload_result = cloudinary.uploader.upload(
-                    temp_file_path,
-                    public_id=public_id,
-                    resource_type=resource_type,
-                    overwrite=False,
-                    use_filename=False,
-                    tags=["simulation", f"user_{user_id}", file_type]
-                )
+            # Upload to Cloudinary with enhanced configuration
+            upload_result = cloudinary.uploader.upload(
+                temp_file_path,
+                public_id=public_id,
+                resource_type=resource_type,
+                overwrite=False,
+                use_filename=False,
+                tags=["simulation", f"user_{user_id}", file_type],
+                timeout=60,  # 60 second timeout
+                chunk_size=6000000,  # 6MB chunks for large files
+                eager_async=False  # Wait for upload to complete
+            )
+            
+            logger.info(f"Simulation uploaded successfully: {public_id}")
+            
+            return {
+                'success': True,
+                'public_id': upload_result['public_id'],
+                'secure_url': upload_result['secure_url'],
+                'file_size': upload_result['bytes'],
+                'resource_type': upload_result['resource_type'],
+                'created_at': upload_result['created_at'],
+                'version': upload_result['version'],
+                'format': upload_result.get('format', file_type),
+                'tags': upload_result.get('tags', [])
+            }
                 
-                logger.info(f"Simulation uploaded successfully: {public_id}")
-                
-                return {
-                    'success': True,
-                    'public_id': upload_result['public_id'],
-                    'secure_url': upload_result['secure_url'],
-                    'file_size': upload_result['bytes'],
-                    'resource_type': upload_result['resource_type'],
-                    'created_at': upload_result['created_at'],
-                    'version': upload_result['version'],
-                    'format': upload_result.get('format', file_type),
-                    'tags': upload_result.get('tags', [])
-                }
-                
-            finally:
-                # Clean up temporary file
-                if os.path.exists(temp_file_path):
-                    os.unlink(temp_file_path)
-                    
         except CloudinaryUploadError:
             raise
         except Exception as e:
             logger.error(f"Simulation upload failed: {str(e)}")
             raise CloudinaryUploadError(f"Upload failed: {str(e)}")
+        finally:
+            # Clean up temporary file
+            if temp_file_path and os.path.exists(temp_file_path):
+                try:
+                    os.unlink(temp_file_path)
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp file {temp_file_path}: {str(e)}")
     
     def get_download_url(self, public_id: str, expiration: int = 3600) -> str:
         """
