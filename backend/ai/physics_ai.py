@@ -1,5 +1,11 @@
 """
-AI Integration Module for Physics Tutor
+AI Integration Mod        # Initialize primary AI model for response generation
+        self.primary_model = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash-exp",
+            temperature=0.7,
+            max_tokens=2048,
+            google_api_key=os.getenv('GEMINI_API_KEY')
+        ) Physics Tutor
 Handles both primary AI response generation and supervisor evaluation using Gemini
 """
 
@@ -22,18 +28,18 @@ class PhysicsAI:
         
         # Initialize primary AI model for response generation
         self.primary_model = ChatGoogleGenerativeAI(
-            model="gemini-pro",
+            model="gemini-2.0-flash",
             temperature=0.7,
             max_tokens=2048,
             google_api_key=os.getenv('GEMINI_API_KEY')
         )
         
         # Initialize supervisor model for quality evaluation
-        self.supervisor_model = ChatGoogleGenerativeAI(
-            model="gemini-pro",
-            temperature=0.1,  # Lower temperature for more consistent evaluation
-            max_tokens=1024,
-            google_api_key=os.getenv('SUPERVISOR_API_KEY', os.getenv('GEMINI_API_KEY'))
+        self.supervisor_llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-pro-exp",
+            google_api_key=os.getenv('GEMINI_API_KEY'),
+            temperature=0.1,
+            convert_system_message_to_human=True
         )
         
         # Load prompt templates
@@ -150,7 +156,7 @@ Return JSON format with classification results."""),
             
             return {
                 'content': response.content,
-                'model': 'gemini-pro',
+                'model': 'gemini-2.0-flash-exp',
                 'timestamp': datetime.now(),
                 'context_used': context_info,
                 'response_length': response_length
@@ -160,7 +166,7 @@ Return JSON format with classification results."""),
             print(f"Error generating response: {e}")
             return {
                 'content': "I apologize, but I'm having difficulty generating a response right now. Please try again later.",
-                'model': 'gemini-pro',
+                'model': 'gemini-2.0-flash-exp',
                 'timestamp': datetime.now(),
                 'error': str(e)
             }
@@ -208,7 +214,7 @@ Return JSON format with classification results."""),
                 context=context_str
             )
             
-            evaluation = await self.supervisor_model.ainvoke(messages)
+            evaluation = await self.supervisor_llm.ainvoke(messages)
             
             # Parse evaluation response
             import json
@@ -219,7 +225,7 @@ Return JSON format with classification results."""),
                 if 'overall_score' not in eval_data:
                     eval_data['overall_score'] = 7.0  # Default reasonable score
                 
-                eval_data['evaluation_model'] = 'gemini-pro-supervisor'
+                eval_data['evaluation_model'] = 'gemini-2.0-pro-exp-supervisor'
                 eval_data['evaluation_timestamp'] = datetime.now()
                 eval_data['supervisor_confidence'] = 0.8  # Default confidence
                 

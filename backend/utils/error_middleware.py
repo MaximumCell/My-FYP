@@ -321,7 +321,12 @@ def log_request_info():
         logger.debug(f"Request: {request.method} {request.path}")
         logger.debug(f"Headers: {dict(request.headers)}")
         if request.is_json:
-            logger.debug(f"JSON body: {request.get_json()}")
+            try:
+                json_body = request.get_json(silent=True)
+                if json_body is not None:
+                    logger.debug(f"JSON body: {json_body}")
+            except Exception as e:
+                logger.debug(f"Could not parse JSON body: {str(e)}")
 
 
 def setup_error_handlers(app):

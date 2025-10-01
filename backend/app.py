@@ -1,7 +1,15 @@
 # Main App Entry Point
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+# Ensure the repository root is on sys.path so imports like `import backend.xxx` work
+# whether the app is run from the repo root or from the backend/ subdirectory.
+repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if repo_root not in sys.path:
+    sys.path.insert(0, repo_root)
+# Also make sure the backend directory itself is available for local imports
+backend_dir = os.path.abspath(os.path.dirname(__file__))
+if backend_dir not in sys.path:
+    sys.path.insert(0, backend_dir)
 
 from flask import Flask
 from flask_cors import CORS
@@ -11,6 +19,9 @@ from routes.ai_routes import ai_bp
 from routes.user_routes import user_bp
 from routes.model_management import model_bp
 from routes.simulation_management import simulation_bp as simulation_mgmt_bp
+from routes.materials_routes import materials_bp
+from routes.books_routes import bp as books_bp
+from routes.physics_advanced_routes import physics_bp as physics_advanced_bp
 from utils.database import init_database, close_database, get_database
 from utils.error_middleware import setup_error_handlers, get_error_stats
 from utils.retry_mechanisms import with_database_retry
@@ -93,6 +104,9 @@ app.register_blueprint(ai_bp, url_prefix='/ai')
 app.register_blueprint(user_bp, url_prefix='/api/users')  # New user routes
 app.register_blueprint(model_bp)  # Model management routes (already includes /api/models prefix)
 app.register_blueprint(simulation_mgmt_bp)  # Simulation management routes (already includes /api/simulations prefix)
+app.register_blueprint(materials_bp)
+app.register_blueprint(books_bp)  # Physics books routes (includes /api/books prefix)
+app.register_blueprint(physics_advanced_bp)  # Phase 7.3 advanced physics routes
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])

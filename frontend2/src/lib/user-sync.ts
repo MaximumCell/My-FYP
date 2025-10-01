@@ -116,8 +116,23 @@ export async function getUserDashboard(clerkUserId: string): Promise<DashboardDa
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-            throw new Error(errorData.error || `HTTP ${response.status}`);
+            let errorMessage = `HTTP ${response.status}`;
+            try {
+                const errorData = await response.json();
+                errorMessage = errorData.error || errorMessage;
+            } catch (e) {
+                // If JSON parsing fails, try to get text
+                try {
+                    const errorText = await response.text();
+                    if (errorText) {
+                        errorMessage = errorText;
+                    }
+                } catch (textError) {
+                    // Keep default error message
+                }
+            }
+            console.error('Dashboard API error:', errorMessage);
+            throw new Error(errorMessage);
         }
 
         const result: DashboardData = await response.json();

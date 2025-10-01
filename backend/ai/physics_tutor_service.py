@@ -10,7 +10,9 @@ from datetime import datetime
 import uuid
 
 from ai.physics_ai import physics_ai
-from ai.latex_renderer import latex_renderer
+from ai.latex_renderer import physics_latex_renderer
+from ai.source_prioritizer import prioritize_sources
+from ai.citation_manager import generate_citations
 from models.physics_knowledge import physics_knowledge_db
 from models.response_evaluation import response_evaluation_db, ResponseEvaluation, UserQuery, AIResponse, SupervisorEvaluation, EvaluationMetadata, EvaluationCriteria, DetailedFeedback
 from models.physics_chat_session import physics_chat_session_db, PhysicsChatSession, ConversationMessage, LearningContext, MessageMetadata
@@ -19,7 +21,7 @@ from models.physics_chat_session import physics_chat_session_db, PhysicsChatSess
 class PhysicsTutorService:
     def __init__(self):
         self.ai = physics_ai
-        self.latex_renderer = latex_renderer
+        self.latex_renderer = physics_latex_renderer
         self.knowledge_db = physics_knowledge_db
         self.evaluation_db = response_evaluation_db
         self.chat_session_db = physics_chat_session_db
@@ -109,12 +111,40 @@ class PhysicsTutorService:
                 'difficulty_level': learning_context.get('difficulty_preference', 'intermediate'),
                 'current_topic': learning_context.get('current_topic')
             }
-            
+
+            # Build candidate sources: user materials and knowledge DB retrievals
+            try:
+                user_materials = []
+                # Attempt to fetch user materials from DB if available
+                try:
+                    # chat_session_db stores user_id and session data; use user_id to fetch materials
+                    from models.materials import materials_db
+                    user_materials = materials_db.get_by_user(user_id) or []
+                except Exception:
+                    user_materials = []
+
+                # Retrieve top knowledge base candidates for the question/topic
+                kb_results = []
+                try:
+                    kb_results = self.knowledge_db.search(user_question, top_k=5) or []
+                except Exception:
+                    kb_results = []
+
+                # Preferred books: if session provides ids/names, pass as list
+                preferred_books = learning_context.get('preferred_books', []) or []
+
+                prioritized = prioritize_sources(user_materials, preferred_books, kb_results, [])
+                # Choose top N source ids to pass into the AI generator
+                top_source_ids = [s.get('id') for s in prioritized[:5]]
+            except Exception:
+                prioritized = []
+                top_source_ids = sources or []
+
             ai_response = await self.ai.generate_response(
-                user_question, 
+                user_question,
                 context=context,
                 response_length=response_length,
-                sources=sources
+                sources=top_source_ids or sources
             )
             
             if 'error' in ai_response:
@@ -169,7 +199,7 @@ class PhysicsTutorService:
             # Step 6: Create message metadata
             message_metadata = MessageMetadata(
                 question_type=question_classification.get('category'),
-                sources_used=sources or [],
+                sources_used=top_source_ids if 'top_source_ids' in locals() else (sources or []),
                 confidence_level=evaluation_result.get('supervisor_confidence') if evaluation_result else None,
                 visual_aids_generated=[eq['original'] for eq in equation_processing.get('equations', []) if eq.get('success')],
                 response_length=response_length,
@@ -242,7 +272,7 @@ class PhysicsTutorService:
                         evaluation_criteria=evaluation_criteria,
                         detailed_feedback=detailed_feedback,
                         supervisor_confidence=evaluation_result.get('supervisor_confidence', 0.8),
-                        evaluation_model=evaluation_result.get('evaluation_model', 'gemini-pro'),
+                        evaluation_model=evaluation_result.get('evaluation_model', 'gemini-2.0-pro-exp'),
                         alternative_response_suggested=False
                     )
                     
@@ -281,6 +311,17 @@ class PhysicsTutorService:
                 'processing_time': processing_time,
                 'response_length': response_length
             }
+
+            # Attach citations derived from prioritized sources
+            try:
+                citations = generate_citations(prioritized if 'prioritized' in locals() else [])
+                if citations:
+                    response_data['citations'] = citations
+                    # Also attach to metadata and saved evaluation
+                    message_metadata.sources_used = [c.get('source_id') for c in citations]
+            except Exception:
+                # Non-fatal: skip citations
+                pass
             
             # Add quality information if supervisor enabled
             if evaluation_result:

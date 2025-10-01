@@ -132,33 +132,39 @@ async def test_latex_rendering():
     print("🧮 Testing LaTeX rendering...")
     
     try:
-        from ai.latex_renderer import latex_renderer
+        from ai.latex_renderer import physics_latex_renderer, render_physics_equation
         
-        # Test equation extraction
-        print("  📐 Testing equation extraction...")
-        test_text = "The famous equation is $E = mc^2$ and the quadratic formula is $$x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$$"
+        # Test basic equation rendering
+        print("  📐 Testing basic equation rendering...")
+        test_equation = "E = mc^2"
         
-        equations = latex_renderer.extract_latex_equations(test_text)
-        if len(equations) == 2:
-            print(f"    ✅ Equation extraction working (found {len(equations)} equations)")
+        render_result = render_physics_equation(test_equation, output_format='png')
+        if render_result.success:
+            print("    ✅ Basic equation rendering working")
+            print(f"    📊 Render time: {render_result.render_time:.3f}s")
         else:
-            print(f"    ⚠️  Equation extraction found {len(equations)} equations (expected 2)")
+            print(f"    ❌ Basic equation rendering failed: {render_result.error_message}")
+            return False
+        
+        # Test physics template rendering
+        print("  🧪 Testing physics templates...")
+        # Test specific physics template
+        template_result = physics_latex_renderer.create_physics_equation(
+            'newton_second'
+        )
+        if template_result.success:
+            print("    ✅ Physics template rendering working")
+        else:
+            print(f"    ❌ Physics template failed: {template_result.error_message}")
+            return False
         
         # Test LaTeX validation
         print("  ✅ Testing LaTeX validation...")
-        validation = latex_renderer.validate_latex("E = mc^2")
-        if validation['valid']:
+        if physics_latex_renderer.validate_latex(test_equation):
             print("    ✅ LaTeX validation working")
         else:
             print("    ❌ LaTeX validation failed")
-        
-        # Test equation rendering
-        print("  🎨 Testing equation rendering...")
-        render_result = latex_renderer.render_equation_to_image("E = mc^2")
-        if render_result['success']:
-            print("    ✅ Equation rendering working")
-        else:
-            print(f"    ❌ Equation rendering failed: {render_result.get('error')}")
+            return False
         
         return True
         
