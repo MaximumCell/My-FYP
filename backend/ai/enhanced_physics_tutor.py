@@ -592,11 +592,14 @@ class EnhancedPhysicsAITutor:
         try:
             logger.info(f"🎨 Generating physics diagram: '{description[:50]}...'")
             
+            # Optimize the raw user description to be AI-friendly (reduce noisy/random text in images)
+            optimized_desc = self._optimize_description(description)
+
             # Build enhanced prompt based on diagram type and style
             prompt = self._build_diagram_prompt(
-                description, 
-                diagram_type, 
-                style, 
+                optimized_desc,
+                diagram_type,
+                style,
                 include_labels,
                 session_id
             )
@@ -752,6 +755,44 @@ class EnhancedPhysicsAITutor:
         prompt += " The diagram should be scientifically accurate, clear, and suitable for physics education."
         
         return prompt
+
+    def _optimize_description(self, description: str) -> str:
+        """Rewrite the user's raw description into an image-model-friendly description.
+
+        Goals:
+        - Remove requests that cause models to render arbitrary readable text (e.g., 'write labels' without specifics).
+        - Ask the model to use symbolic placeholders or LaTeX-like notation rather than natural-language words when labels are required.
+        - Keep the user's intent but make instructions explicit and concise.
+        """
+        if not description:
+            return description
+
+        desc = description.strip()
+
+        # Short heuristic cleanups
+        # 1) If user asked for 'labels' without detail, prefer placeholder/symbolic labels
+        import re
+        # Detect generic label requests
+        if re.search(r"\blabels?\b", desc, re.IGNORECASE):
+            # Replace vague label requests with explicit instruction to use standard physics symbols
+            desc = re.sub(r"(?i)\blabels?\b", "labels using standard physics symbols (use symbols like F, m, v; avoid readable sentences)", desc)
+
+        # 2) Discourage rendering of random or decorative text
+        if not re.search(r"\btext\b|\bwords\b|\bphrase\b", desc, re.IGNORECASE):
+            # Explicitly ask the model to avoid rendering arbitrary human-readable text in the image
+            desc += " Do not render arbitrary readable text or random words in the image. If labels are necessary, use short symbols (e.g., 'F', 'm', 'v') or small LaTeX-style notation."
+        else:
+            # If user explicitly requested text, constrain it
+            desc = re.sub(r"(?i)\btext\b|\bwords\b|\bphrase\b", "short, precise labels (use symbols not sentences)", desc)
+
+        # 3) Remove requests for logos, signatures, or handwriting
+        desc = re.sub(r"(?i)logo|signature|handwriting", "", desc)
+
+        # 4) Truncate overly long descriptions to keep prompt concise
+        if len(desc) > 400:
+            desc = desc[:400].rsplit(' ', 1)[0] + "..."
+
+        return desc
     
     def get_enhanced_stats(self) -> Dict[str, Any]:
         """Get comprehensive statistics for the enhanced tutor"""
