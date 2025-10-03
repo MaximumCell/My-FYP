@@ -2,7 +2,15 @@
 Enhanced Physics AI Tutor with Embedding Integration
 ==================================================
 
-This module enhances the existing physics AI tutor with advanced embedding-based
+Thi    async def ask_physics_question(self, 
+                                 question: str, 
+                                 context: Optional[str] = None,
+                                 response_length: str = 'medium',
+                                 difficulty_level: str = 'intermediate',
+                                 use_rag: bool = True,
+                                 max_context_items: int = 5,
+                                 session_id: Optional[str] = None,
+                                 user_id: Optional[str] = None) -> Dict[str, Any]: enhances the existing physics AI tutor with advanced embedding-based
 retrieval and similarity search capabilities using Google's text-embedding-004.
 
 Features:
@@ -94,6 +102,10 @@ class EnhancedPhysicsAITutor:
         
         self.enable_rag = enable_rag
         
+        # Session memory management
+        self.session_history: Dict[str, List[Dict]] = {}  # session_id -> messages
+        self.max_history_per_session = 5  # Keep last 5 messages
+        
         # Enhanced statistics
         self.stats = {
             'total_enhanced_queries': 0,
@@ -104,6 +116,9 @@ class EnhancedPhysicsAITutor:
             'last_reset': datetime.now()
         }
         
+        # Initialize collection asynchronously on first use
+        self._collection_initialized = False
+        
         logger.info("✅ Enhanced Physics AI Tutor initialized with embedding support")
     
     async def ask_physics_question(self, 
@@ -112,7 +127,9 @@ class EnhancedPhysicsAITutor:
                                  response_length: str = "medium",
                                  difficulty_level: str = "intermediate",
                                  use_rag: bool = True,
-                                 max_context_items: int = 5) -> Dict[str, Any]:
+                                 max_context_items: int = 5,
+                                 session_id: Optional[str] = None,
+                                 user_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Ask a physics question with enhanced retrieval and response generation
         
@@ -123,6 +140,8 @@ class EnhancedPhysicsAITutor:
             difficulty_level: Target difficulty level
             use_rag: Whether to use retrieval-augmented generation
             max_context_items: Maximum number of context items to retrieve
+            session_id: Session ID for conversation history
+            user_id: User ID for filtering user-specific materials
             
         Returns:
             Enhanced response with metadata
@@ -145,7 +164,8 @@ class EnhancedPhysicsAITutor:
                 retrieved_context = await self._retrieve_relevant_context(
                     question, 
                     classification,
-                    max_context_items
+                    max_context_items,
+                    user_id=user_id
                 )
                 context_retrieval_time = time.time() - context_start
                 self.stats['context_retrieval_time'] += context_retrieval_time
@@ -161,10 +181,28 @@ class EnhancedPhysicsAITutor:
                 retrieved_context=retrieved_context,
                 user_context=context,
                 response_length=response_length,
-                difficulty_level=difficulty_level
+                difficulty_level=difficulty_level,
+                session_id=session_id
             )
             response_generation_time = time.time() - response_start
             self.stats['response_generation_time'] += response_generation_time
+            
+            # Store in session history for context awareness
+            if session_id:
+                if session_id not in self.session_history:
+                    self.session_history[session_id] = []
+                
+                self.session_history[session_id].append({
+                    'question': question,
+                    'answer': enhanced_response[:500],  # Store truncated answer
+                    'timestamp': datetime.now()
+                })
+                
+                # Keep only recent messages
+                if len(self.session_history[session_id]) > self.max_history_per_session:
+                    self.session_history[session_id] = self.session_history[session_id][-self.max_history_per_session:]
+                
+                logger.info(f"💾 Stored message in session {session_id} (total: {len(self.session_history[session_id])})")
             
             total_time = time.time() - start_time
             
@@ -264,8 +302,18 @@ class EnhancedPhysicsAITutor:
     async def _retrieve_relevant_context(self, 
                                        question: str, 
                                        classification: Dict[str, Any],
-                                       max_items: int = 5) -> List[SearchResult]:
+                                       max_items: int = 5,
+                                       user_id: Optional[str] = None) -> List[SearchResult]:
         """Retrieve relevant context from the knowledge base"""
+        
+        # Skip retrieval for greetings or very short queries
+        greetings = ['hi', 'hello', 'hey', 'thanks', 'thank you', 'bye', 'goodbye']
+        question_lower = question.lower().strip()
+        
+        if question_lower in greetings or len(question.split()) < 3:
+            logger.info("⚡ Skipping context retrieval for greeting/short query")
+            return []
+        
         try:
             # Build search filters based on classification
             topic_filter = classification.get('topic')
@@ -274,22 +322,50 @@ class EnhancedPhysicsAITutor:
                 
             difficulty_filter = classification.get('difficulty')
             
-            # Perform vector search
-            search_response = await self.vector_database.search_physics_content(
-                query=question,
-                limit=max_items,
-                topic_filter=topic_filter,
-                difficulty_filter=difficulty_filter,
-                min_similarity=0.3
-            )
+            # For user-specific searches, be more flexible with filters to find user content
+            if user_id:
+                # First try with user_id only (no topic/difficulty restrictions)
+                search_response = await self.vector_database.search_physics_content(
+                    query=question,
+                    limit=min(max_items, 5),
+                    user_id=user_id,  # Only filter by user materials
+                    min_similarity=0.3  # Lower threshold for user materials
+                )
+                
+                # If we found user content, use it
+                if search_response.results:
+                    logger.info(f"✅ Found {len(search_response.results)} user-specific results")
+                else:
+                    # Fallback to general search with topic/difficulty filters
+                    logger.info("🔄 No user content found, searching general knowledge...")
+                    search_response = await self.vector_database.search_physics_content(
+                        query=question,
+                        limit=min(max_items, 3),
+                        topic_filter=topic_filter,
+                        difficulty_filter=difficulty_filter,
+                        min_similarity=0.5
+                    )
+            else:
+                # No user_id provided, use general search with filters
+                search_response = await self.vector_database.search_physics_content(
+                    query=question,
+                    limit=min(max_items, 3),
+                    topic_filter=topic_filter,
+                    difficulty_filter=difficulty_filter,
+                    min_similarity=0.5
+                )
             
             # Calculate average relevance for statistics
             if search_response.results:
                 avg_relevance = sum(r.similarity_score for r in search_response.results) / len(search_response.results)
-                self.stats['average_context_relevance'] = (
-                    (self.stats['average_context_relevance'] * (self.stats['rag_queries'] - 1) + avg_relevance) 
-                    / self.stats['rag_queries']
-                )
+                # Avoid division by zero in statistics calculation
+                if self.stats['rag_queries'] > 0:
+                    self.stats['average_context_relevance'] = (
+                        (self.stats['average_context_relevance'] * (self.stats['rag_queries'] - 1) + avg_relevance) 
+                        / self.stats['rag_queries']
+                    )
+                else:
+                    self.stats['average_context_relevance'] = avg_relevance
             
             return search_response.results
             
@@ -303,11 +379,17 @@ class EnhancedPhysicsAITutor:
                                         retrieved_context: List[SearchResult],
                                         user_context: Optional[str],
                                         response_length: str,
-                                        difficulty_level: str) -> str:
+                                        difficulty_level: str,
+                                        session_id: Optional[str] = None) -> str:
         """Generate enhanced response using retrieved context"""
         
-        # Prepare context for the AI
-        context_text = self._format_context_for_ai(retrieved_context, user_context)
+        # Prepare context for the AI with session history
+        context_text = self._format_context_for_ai(
+            retrieved_context, 
+            user_context,
+            session_id=session_id,
+            question=question
+        )
         
         # Select appropriate chain based on question category
         category = classification.get('category', 'concept')
@@ -355,28 +437,51 @@ class EnhancedPhysicsAITutor:
             return response
             
         except Exception as e:
-            logger.error(f"Response generation failed: {e}")
+            logger.error(f"Response generation failed: {e}", exc_info=True)
+            logger.error(f"Question: {question}")
+            logger.error(f"Category: {category}")
+            logger.error(f"Context length: {len(context_text)} chars")
+            logger.error(f"Retrieved context items: {len(retrieved_context)}")
             return f"I apologize, but I encountered an error while generating the response. Please try rephrasing your question."
     
     def _format_context_for_ai(self, 
                               retrieved_context: List[SearchResult], 
-                              user_context: Optional[str]) -> str:
-        """Format retrieved context for AI consumption"""
+                              user_context: Optional[str],
+                              session_id: Optional[str] = None,
+                              question: Optional[str] = None) -> str:
+        """Format retrieved context for AI consumption with session history"""
         context_parts = []
         
-        # Add user-provided context first (highest priority)
+        # Add recent conversation history (most important for context)
+        if session_id and session_id in self.session_history:
+            recent = self.session_history[session_id][-3:]  # Last 3 messages
+            if recent:
+                context_parts.append("Recent Conversation:")
+                for msg in recent:
+                    context_parts.append(f"Q: {msg['question'][:80]}...")
+                    context_parts.append(f"A: {msg['answer'][:150]}...\n")
+        
+        # Add user-provided context
         if user_context:
             context_parts.append(f"User Context: {user_context}")
         
-        # Add retrieved context items
+        # Add only high-quality retrieved context
         if retrieved_context:
-            context_parts.append("Relevant Knowledge Base Content:")
-            for i, item in enumerate(retrieved_context):
-                context_parts.append(
-                    f"{i+1}. {item.content.title} (Topic: {item.content.topic}, "
-                    f"Similarity: {item.similarity_score:.3f})\n"
-                    f"   Content: {item.content.content}"
-                )
+            # Filter for high similarity (>0.6) and limit to 2 items
+            high_quality = [r for r in retrieved_context if r.similarity_score > 0.6][:2]
+            
+            if high_quality:
+                context_parts.append("Relevant Knowledge:")
+                for i, item in enumerate(high_quality):
+                    # Truncate content to 300 chars to save tokens
+                    content_preview = item.content.content[:300]
+                    if len(item.content.content) > 300:
+                        content_preview += "..."
+                    
+                    context_parts.append(
+                        f"{i+1}. {item.content.title} (Similarity: {item.similarity_score:.2f})\n"
+                        f"   {content_preview}"
+                    )
         
         return "\n\n".join(context_parts) if context_parts else "No additional context available."
     
@@ -455,6 +560,189 @@ class EnhancedPhysicsAITutor:
             logger.error(error_msg)
             return f"I apologize, but I couldn't analyze the image. Error: {error_msg}"
     
+    async def generate_physics_diagram(self,
+                                     description: str,
+                                     diagram_type: str = "general",
+                                     style: str = "educational",
+                                     include_labels: bool = True,
+                                     session_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Generate physics diagrams using Gemini 2.5 Flash Image
+        
+        Args:
+            description: Description of what to draw
+            diagram_type: Type of diagram (force, circuit, wave, energy, motion, etc.)
+            style: Visual style (educational, technical, sketch, colorful)
+            include_labels: Whether to include labels and annotations
+            session_id: Session ID for conversation context
+            
+        Returns:
+            Dict with image data, explanation, and metadata
+        """
+        try:
+            logger.info(f"🎨 Generating physics diagram: '{description[:50]}...'")
+            
+            # Build enhanced prompt based on diagram type and style
+            prompt = self._build_diagram_prompt(
+                description, 
+                diagram_type, 
+                style, 
+                include_labels,
+                session_id
+            )
+            
+            # Import Google GenAI client
+            try:
+                from google import genai
+                from google.genai import types
+                from PIL import Image
+                from io import BytesIO
+                import os
+                import base64
+            except ImportError as e:
+                logger.error(f"Missing required libraries: {e}")
+                return {
+                    'success': False,
+                    'error': 'Missing required libraries. Please install google-genai and Pillow.'
+                }
+            
+            # Initialize client with API key from environment
+            # Try both GOOGLE_API_KEY and GEMINI_API_KEY for compatibility
+            api_key = os.getenv('GOOGLE_API_KEY') or os.getenv('GEMINI_API_KEY')
+            if not api_key:
+                logger.error("API key not found (tried GOOGLE_API_KEY and GEMINI_API_KEY)")
+                return {
+                    'success': False,
+                    'error': 'API key not configured. Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.'
+                }
+            
+            client = genai.Client(api_key=api_key)
+            
+            # Generate image with Gemini 2.0 Flash Image Generation model
+            # This model requires both TEXT and IMAGE modalities
+            config = types.GenerateContentConfig(
+                response_modalities=["TEXT", "IMAGE"],
+                temperature=0.4,  # Balance creativity with accuracy
+            )
+            
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-preview-image-generation",
+                contents=[prompt],
+                config=config,
+            )
+            
+            # Extract text explanation and image
+            explanation = None
+            image_data = None
+            image_base64 = None
+            
+            for part in response.candidates[0].content.parts:
+                if part.text is not None:
+                    explanation = part.text
+                elif part.inline_data is not None:
+                    # Convert image data to base64 for frontend
+                    image_data = part.inline_data.data
+                    image_base64 = base64.b64encode(image_data).decode('utf-8')
+                    
+                    # Also save to file for serving
+                    image = Image.open(BytesIO(image_data))
+                    
+                    # Create images directory if it doesn't exist
+                    images_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'generated_images')
+                    os.makedirs(images_dir, exist_ok=True)
+                    
+                    # Generate unique filename
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    filename = f"physics_diagram_{timestamp}_{hash(description) % 10000}.png"
+                    filepath = os.path.join(images_dir, filename)
+                    
+                    # Save image
+                    image.save(filepath, 'PNG')
+                    logger.info(f"💾 Saved diagram to: {filepath}")
+            
+            if image_base64:
+                result = {
+                    'success': True,
+                    'image_base64': image_base64,
+                    'image_url': f"/static/generated_images/{filename}",
+                    'explanation': explanation or "Diagram generated successfully.",
+                    'diagram_type': diagram_type,
+                    'style': style,
+                    'prompt_used': description,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+                logger.info(f"✅ Diagram generated successfully")
+                return result
+            else:
+                logger.warning("No image generated in response")
+                return {
+                    'success': False,
+                    'error': 'No image was generated. Please try rephrasing your request.'
+                }
+                
+        except Exception as e:
+            logger.error(f"Diagram generation failed: {e}", exc_info=True)
+            return {
+                'success': False,
+                'error': f"Failed to generate diagram: {str(e)}"
+            }
+    
+    def _build_diagram_prompt(self,
+                            description: str,
+                            diagram_type: str,
+                            style: str,
+                            include_labels: bool,
+                            session_id: Optional[str] = None) -> str:
+        """Build optimized prompt for physics diagram generation"""
+        
+        # Check session history for context
+        context = ""
+        if session_id and session_id in self.session_history:
+            recent = self.session_history[session_id][-2:]  # Last 2 messages
+            if recent:
+                topics = [msg['question'] for msg in recent]
+                context = f"Context from conversation: discussing {', '.join(topics)}. "
+        
+        # Base prompt templates by diagram type
+        type_prompts = {
+            'force': "Create a clear physics force diagram showing ",
+            'circuit': "Create an electrical circuit diagram showing ",
+            'wave': "Create a wave diagram illustrating ",
+            'energy': "Create an energy diagram showing ",
+            'motion': "Create a motion diagram depicting ",
+            'field': "Create a field diagram showing ",
+            'vector': "Create a vector diagram illustrating ",
+            'graph': "Create a physics graph showing ",
+            'general': "Create a physics diagram showing "
+        }
+        
+        base_prompt = type_prompts.get(diagram_type, type_prompts['general'])
+        
+        # Style modifiers
+        style_modifiers = {
+            'educational': "in a clear, educational style suitable for teaching. Use clean lines, bright colors, and a white background.",
+            'technical': "in a technical, precise style with accurate proportions and professional presentation.",
+            'sketch': "in a hand-drawn sketch style, as if drawn on a whiteboard.",
+            'colorful': "in a vibrant, colorful style that makes the concepts engaging and memorable.",
+            'minimal': "in a minimal, clean style with simple lines and limited colors for clarity."
+        }
+        
+        style_modifier = style_modifiers.get(style, style_modifiers['educational'])
+        
+        # Label instructions
+        label_instruction = ""
+        if include_labels:
+            label_instruction = " Include clear labels, arrows, and annotations to explain all key components and forces. Use standard physics notation."
+        
+        # Build final prompt
+        prompt = f"{context}{base_prompt}{description} {style_modifier}{label_instruction}"
+        
+        # Add physics-specific quality modifiers
+        prompt += " The diagram should be scientifically accurate, clear, and suitable for physics education."
+        
+        return prompt
+    
     def get_enhanced_stats(self) -> Dict[str, Any]:
         """Get comprehensive statistics for the enhanced tutor"""
         base_stats = self.vector_database.get_database_stats()
@@ -520,7 +808,9 @@ class EnhancedPhysicsAITutor:
                 question=query,
                 response_length=response_length,
                 difficulty_level=complexity_level,
-                use_rag=True
+                use_rag=True,
+                session_id=session_id,
+                user_id=user_id
             )
             
             if not base_response.get('success'):

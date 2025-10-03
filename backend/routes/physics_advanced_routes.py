@@ -4,6 +4,13 @@ Phase 7.3 Physics AI Routes - Advanced Response Generation
 from flask import Blueprint, request, jsonify, current_app
 import asyncio
 from datetime import datetime
+import threading
+from functools import wraps
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Try package imports first
 try:
@@ -19,14 +26,60 @@ except ImportError:
 
 physics_bp = Blueprint('physics_advanced', __name__, url_prefix='/api/physics')
 
-# Global tutor instance
+# Global tutor instance and event loop
 tutor_instance = None
+event_loop = None
+loop_thread = None
+
+def get_or_create_event_loop():
+    """Get or create a persistent event loop in a separate thread"""
+    global event_loop, loop_thread
+    
+    if event_loop is None or event_loop.is_closed():
+        def run_loop(loop):
+            asyncio.set_event_loop(loop)
+            loop.run_forever()
+        
+        event_loop = asyncio.new_event_loop()
+        loop_thread = threading.Thread(target=run_loop, args=(event_loop,), daemon=True)
+        loop_thread.start()
+    
+    return event_loop
+
+def run_async(coro):
+    """Run an async coroutine using the persistent event loop"""
+    loop = get_or_create_event_loop()
+    future = asyncio.run_coroutine_threadsafe(coro, loop)
+    return future.result(timeout=120)  # Increased timeout to 120 seconds
 
 def get_tutor():
-    """Get or create tutor instance"""
+    """Get or create tutor instance with Qdrant client"""
     global tutor_instance
     if tutor_instance is None:
-        tutor_instance = EnhancedPhysicsAITutor()
+        # Import and create Qdrant client
+        try:
+            import os
+            # Try package import first
+            try:
+                from backend.qdrant_client import create_physics_vector_db
+            except ImportError:
+                # Fallback for direct execution
+                from qdrant_client import create_physics_vector_db
+            
+            qdrant_url = os.getenv('QDRANT_URL', 'https://my-fyp-hcom.onrender.com')
+            qdrant_api_key = os.getenv('QDRANT_API_KEY', '')
+            
+            # Create Qdrant client for vector search
+            qdrant_client = create_physics_vector_db(qdrant_url, qdrant_api_key)
+            
+            # Initialize tutor with Qdrant client
+            tutor_instance = EnhancedPhysicsAITutor(qdrant_client=qdrant_client)
+            current_app.logger.info(f"✅ Enhanced Physics Tutor initialized with Qdrant at {qdrant_url}")
+        except Exception as e:
+            current_app.logger.warning(f"⚠️ Could not initialize Qdrant client: {e}")
+            # Fall back to tutor without Qdrant
+            tutor_instance = EnhancedPhysicsAITutor()
+    
     return tutor_instance
 
 
@@ -62,20 +115,15 @@ def ask_physics_question():
         # Get tutor and generate response
         tutor = get_tutor()
         
-        # Run async function in sync context
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            response = loop.run_until_complete(
-                tutor.generate_enhanced_response(
-                    query=question,
-                    user_id=user_id,
-                    session_id=session_id,
-                    preferences=preferences
-                )
+        # Run async function using persistent event loop
+        response = run_async(
+            tutor.generate_enhanced_response(
+                query=question,
+                user_id=user_id,
+                session_id=session_id,
+                preferences=preferences
             )
-        finally:
-            loop.close()
+        )
         
         return jsonify(response), 200 if response.get('success') else 500
         
@@ -102,6 +150,7 @@ def quick_ask():
         data = request.json or {}
         question = data.get('question')
         response_length = data.get('length', 'medium')
+        user_id = data.get('user_id') or request.headers.get('X-User-ID')
         
         if not question:
             return jsonify({'success': False, 'error': 'Question is required'}), 400
@@ -109,19 +158,15 @@ def quick_ask():
         tutor = get_tutor()
         
         # Simple response without all enhancements
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            response = loop.run_until_complete(
-                tutor.ask_physics_question(
-                    question=question,
-                    response_length=response_length,
-                    use_rag=True,
-                    max_context_items=3
-                )
+        response = run_async(
+            tutor.ask_physics_question(
+                question=question,
+                response_length=response_length,
+                use_rag=True,
+                max_context_items=3,
+                user_id=user_id
             )
-        finally:
-            loop.close()
+        )
         
         return jsonify(response), 200 if response.get('success') else 500
         
@@ -159,19 +204,14 @@ def request_derivation():
         
         tutor = get_tutor()
         
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            response = loop.run_until_complete(
-                tutor.generate_enhanced_response(
-                    query=derivation_query,
-                    user_id=user_id or 'anonymous',
-                    session_id=f"deriv_{datetime.now().timestamp()}",
-                    preferences={'length': 'long', 'level': level}
-                )
+        response = run_async(
+            tutor.generate_enhanced_response(
+                query=derivation_query,
+                user_id=user_id or 'anonymous',
+                session_id=f"deriv_{datetime.now().timestamp()}",
+                preferences={'length': 'long', 'level': level}
             )
-        finally:
-            loop.close()
+        )
         
         return jsonify(response), 200 if response.get('success') else 500
         
@@ -205,19 +245,14 @@ def explain_concept():
         query = f"Explain {concept}"
         tutor = get_tutor()
         
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            response = loop.run_until_complete(
-                tutor.generate_enhanced_response(
-                    query=query,
-                    user_id='anonymous',
-                    session_id=f"explain_{datetime.now().timestamp()}",
-                    preferences={'length': 'medium', 'level': level}
-                )
+        response = run_async(
+            tutor.generate_enhanced_response(
+                query=query,
+                user_id='anonymous',
+                session_id=f"explain_{datetime.now().timestamp()}",
+                preferences={'length': 'medium', 'level': level}
             )
-        finally:
-            loop.close()
+        )
         
         return jsonify(response), 200 if response.get('success') else 500
         
@@ -242,6 +277,69 @@ def get_tutor_stats():
         }), 200
         
     except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@physics_bp.route('/generate-diagram', methods=['POST'])
+def generate_diagram():
+    """
+    Generate physics diagrams using AI
+    
+    Request JSON:
+    {
+        "description": str (required) - What to draw
+        "diagram_type": str (optional) - force, circuit, wave, energy, motion, field, vector, graph, general
+        "style": str (optional) - educational, technical, sketch, colorful, minimal
+        "include_labels": bool (optional) - Whether to include labels
+        "session_id": str (optional) - For conversation context
+    }
+    
+    Response:
+    {
+        "success": bool,
+        "image_base64": str - Base64 encoded image,
+        "image_url": str - URL to access image,
+        "explanation": str - Text explanation of the diagram,
+        "diagram_type": str,
+        "style": str,
+        "timestamp": str
+    }
+    """
+    try:
+        data = request.json or {}
+        description = data.get('description')
+        
+        if not description:
+            return jsonify({
+                'success': False,
+                'error': 'Description is required'
+            }), 400
+        
+        diagram_type = data.get('diagram_type', 'general')
+        style = data.get('style', 'educational')
+        include_labels = data.get('include_labels', True)
+        session_id = data.get('session_id')
+        
+        tutor = get_tutor()
+        
+        # Run async diagram generation
+        response = run_async(
+            tutor.generate_physics_diagram(
+                description=description,
+                diagram_type=diagram_type,
+                style=style,
+                include_labels=include_labels,
+                session_id=session_id
+            )
+        )
+        
+        return jsonify(response), 200 if response.get('success') else 500
+        
+    except Exception as e:
+        current_app.logger.exception('Diagram generation error')
         return jsonify({
             'success': False,
             'error': str(e)
