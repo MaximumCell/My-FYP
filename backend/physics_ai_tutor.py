@@ -98,7 +98,9 @@ class PhysicsAITutor:
             Your goal is to provide clear, accurate, and educational explanations of physics concepts.
             
             Guidelines:
-            - Always start with the fundamental concept
+            - Check the context for "Recent Conversation" to understand if this is a follow-up question
+            - If user asks "give an example", "explain more", "try again", refer to recent messages
+            - Always start with the fundamental concept (or continue from previous context)
             - Use step-by-step explanations for complex topics
             - Include relevant equations with proper notation
             - Provide concrete examples when helpful
@@ -108,11 +110,11 @@ class PhysicsAITutor:
             """),
             ("human", """Explain the physics concept: {concept}
             
-            Context: {context}
+            Context (includes recent conversation if available): {context}
             Difficulty Level: {difficulty_level}
             Response Length: {response_length}
             
-            Please provide a {response_length} explanation appropriate for {difficulty_level} level.""")
+            Please provide a {response_length} explanation appropriate for {difficulty_level} level. If this is a follow-up (like "give example", "try again"), refer to the Recent Conversation in context.""")
         ])
         
         # 2. Derivation Template
@@ -189,19 +191,20 @@ class PhysicsAITutor:
         
         # 5. RAG-Enhanced Response Template
         templates['rag_response'] = ChatPromptTemplate.from_messages([
-            ("system", """You are an expert physics tutor with access to relevant physics content.
+            ("system", """You are an expert physics tutor with access to relevant physics content and conversation history.
             Use the provided context to enhance your response while maintaining accuracy.
             
             Guidelines:
+            - Check "Recent Conversation" in the context for previous messages in this session
+            - If the user asks follow-up questions like "give me an example", "explain more", "try again", refer to recent conversation to understand what topic they're asking about
             - Prioritize information from the provided context
             - If context is insufficient, clearly state limitations
-            - Cite sources when using specific information
-            - Maintain educational focus
+            - Maintain educational focus and conversational continuity
             - Ensure mathematical accuracy
             """),
             ("human", """Question: {question}
             
-            Relevant Context from Knowledge Base:
+            Context (includes recent conversation and knowledge base):
             {context}
             
             User Preferences:
@@ -209,7 +212,7 @@ class PhysicsAITutor:
             - Difficulty Level: {difficulty_level}
             - Focus Areas: {focus_areas}
             
-            Please provide a comprehensive response using the context and your physics knowledge.""")
+            Please provide a comprehensive response. If this is a follow-up question (like "give an example", "explain more", "try again"), use the Recent Conversation to understand what topic the user is referring to.""")
         ])
         
         # 6. Image Analysis Template (for physics diagrams, graphs, equations)

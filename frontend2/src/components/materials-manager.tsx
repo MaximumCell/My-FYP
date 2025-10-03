@@ -48,6 +48,7 @@ export function MaterialsManager() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form state
   const [file, setFile] = useState<File | null>(null);
@@ -95,6 +96,7 @@ export function MaterialsManager() {
         file,
         title: title.trim(),
         material_type: materialType,
+        user_id: user?.id,
         book_info: materialType === 'textbook_chapter' ? bookInfo : undefined,
       });
 
@@ -123,8 +125,23 @@ export function MaterialsManager() {
 
   // Handle delete
   const handleDelete = async (materialId: string) => {
+    if (!user?.id) {
+      toast({
+        title: 'Error',
+        description: 'User not authenticated',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Prevent double-clicking
+    if (deletingId) {
+      return;
+    }
+
+    setDeletingId(materialId);
     try {
-      await deleteMaterial(materialId);
+      await deleteMaterial(materialId, user.id);
       toast({
         title: 'Success',
         description: 'Material deleted successfully',
@@ -133,9 +150,11 @@ export function MaterialsManager() {
     } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to delete material',
+        description: error.response?.data?.error || 'Failed to delete material',
         variant: 'destructive',
       });
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -171,11 +190,11 @@ export function MaterialsManager() {
 
             <div className="space-y-3">
               <div>
-                <Label htmlFor="file">File (PDF, PNG, JPG)</Label>
+                <Label htmlFor="file">File (PDF, PNG, JPG, DOCX, PPTX)</Label>
                 <Input
                   id="file"
                   type="file"
-                  accept=".pdf,.png,.jpg,.jpeg"
+                  accept=".pdf,.png,.jpg,.jpeg,.docx,.pptx"
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
                   disabled={uploading}
                 />
@@ -327,8 +346,13 @@ export function MaterialsManager() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(material._id)}
+                            disabled={deletingId === material._id}
                           >
-                            <Trash2 className="h-4 w-4 text-destructive" />
+                            {deletingId === material._id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            )}
                           </Button>
                         </div>
                       </CardContent>

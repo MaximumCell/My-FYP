@@ -1,7 +1,19 @@
 """
 Content extraction and indexing utilities for Phase 7.2
 ----------------------------------------------------
-This module provides:
+T    # ✅ NEW: Create Qdrant client if not provided
+    if qdrant_client is None:
+        try:
+            import os
+            from qdrant_client import QdrantClient as QClient
+            
+            qdrant_url = os.getenv('QDRANT_URL', 'https://my-fyp-hcom.onrender.com')
+            qdrant_api_key = os.getenv('QDRANT_API_KEY', '')
+            
+            qdrant_client = QClient(qdrant_url, qdrant_api_key)
+            logger.info(f"✅ Created Qdrant client for {qdrant_url}")
+        except Exception as e:
+            logger.warning(f"⚠️  Could not create Qdrant client: {e}")ovides:
 - text chunking (by size and sentence boundaries)
 - simple metadata extraction (page/chunk ids)
 - embedding preparation using the project's embedding service
@@ -112,9 +124,27 @@ async def index_chunks(chunks: List[Dict[str, Any]],
     if not chunks:
         return {'success': False, 'error': 'no_chunks'}
 
+    # Create Qdrant client if not provided
+    if qdrant_client is None:
+        try:
+            import os
+            from qdrant_client import QdrantClient as QClient
+            
+            qdrant_url = os.getenv('QDRANT_URL', 'https://my-fyp-hcom.onrender.com')
+            qdrant_api_key = os.getenv('QDRANT_API_KEY', '')
+            
+            qdrant_client = QClient(qdrant_url, qdrant_api_key)
+            logger.info(f"✅ Created Qdrant client for {qdrant_url}")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not create Qdrant client: {e}")
+            # Continue without Qdrant client - will store locally only
+
     # Construct items for vector DB
     items = []
     for chunk in chunks:
+        # Get user_id and other metadata from chunk
+        chunk_metadata = chunk.get('metadata', {})
+        
         item = {
             'id': chunk.get('chunk_id') or str(uuid.uuid4()),
             'title': chunk.get('title') or 'user_material_chunk',
@@ -126,7 +156,9 @@ async def index_chunks(chunks: List[Dict[str, Any]],
             'source': chunk.get('source'),
             'metadata': {
                 'start_word': chunk.get('start_word'),
-                'end_word': chunk.get('end_word')
+                'end_word': chunk.get('end_word'),
+                'user_id': chunk_metadata.get('user_id', ''),
+                'material_id': chunk_metadata.get('material_id', '')
             }
         }
         items.append(item)
@@ -141,9 +173,27 @@ async def process_and_index_text(text: str,
                                  overlap: int = 20,
                                  use_cache: bool = True,
                                  collection_name: str = 'physics_knowledge',
-                                 qdrant_client=None) -> Dict[str, Any]:
+                                 qdrant_client=None,
+                                 material_metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Convenience routine to chunk text, embed chunks, and index them.
+    
+    Args:
+        text: Text content to index
+        max_tokens: Maximum tokens per chunk
+        overlap: Overlap between chunks
+        use_cache: Whether to use embedding cache
+        collection_name: Qdrant collection name
+        qdrant_client: Optional Qdrant client
+        material_metadata: Optional metadata about the source material
+            {
+                'title': str,
+                'material_type': str,
+                'user_id': str,
+                'file_name': str,
+                ...
+            }
+    
     Returns a combined processing result.
     """
     chunks = chunk_text(text, max_tokens=max_tokens, overlap=overlap)
@@ -152,10 +202,26 @@ async def process_and_index_text(text: str,
 
     embedded = await embed_chunks(chunks, use_cache=use_cache)
 
-    # Merge embeddings into items for indexing
-    for c in embedded:
-        # attach any additional fields expected by indexer
-        pass
+    # Enhance chunks with material metadata if provided
+    if material_metadata:
+        title = material_metadata.get('title', 'user_material')
+        material_type = material_metadata.get('material_type', 'notes')
+        file_name = material_metadata.get('file_name', '')
+        user_id = material_metadata.get('user_id', '')
+        material_id = material_metadata.get('material_id', '')
+        
+        for c in embedded:
+            c['title'] = title
+            c['topic'] = f"{material_type}_{title.lower().replace(' ', '_')}"
+            c['content_type'] = 'uploaded_material'
+            c['source'] = file_name or title
+            # Store user_id and material_id in metadata for filtering
+            if not c.get('metadata'):
+                c['metadata'] = {}
+            c['metadata']['user_id'] = user_id
+            c['metadata']['material_id'] = material_id
+            # Store original metadata for later reference
+            c['material_metadata'] = material_metadata
 
     index_result = await index_chunks(embedded, collection_name=collection_name, qdrant_client=qdrant_client)
     return {

@@ -20,12 +20,15 @@ pillow>=10.0.0
 langchain>=0.2.0
 langchain-google-genai>=1.0.0
 google-generativeai>=0.3.0
+google-genai>=0.3.0  # For Gemini 2.5 Flash Image generation
 pymongo[srv]>=4.5.0
 asyncio>=3.4.3
 motor>=3.3.0
 python-multipart>=0.0.6
 pdf2image>=1.16.0
 pytesseract>=0.3.10
+python-docx>=0.8.11  # For DOCX file processing
+python-pptx>=0.6.21  # For PPTX file processing
 
 # LaTeX and Visual Generation
 pylatex>=1.4.1

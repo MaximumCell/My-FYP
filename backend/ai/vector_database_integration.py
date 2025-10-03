@@ -114,6 +114,22 @@ class PhysicsVectorDatabase:
         
         logger.info(f"✅ PhysicsVectorDatabase initialized for collection: {collection_name}")
     
+    async def _ensure_collection_exists(self):
+        """Ensure the collection exists, create it if it doesn't"""
+        try:
+            if hasattr(self.qdrant_client, 'initialize'):
+                # PhysicsVectorDB wrapper - use initialize method
+                await self.qdrant_client.initialize()
+                logger.info(f"✅ Collection '{self.collection_name}' initialized via PhysicsVectorDB")
+            elif hasattr(self.qdrant_client, 'create_collection'):
+                # Raw QdrantClient - create collection directly
+                await self.qdrant_client.create_collection(self.collection_name, self.vector_size)
+                logger.info(f"✅ Collection '{self.collection_name}' created via QdrantClient")
+            else:
+                logger.warning(f"⚠️ Cannot create collection - client has no create_collection method")
+        except Exception as e:
+            logger.warning(f"⚠️ Collection creation failed (may already exist): {e}")
+    
     def _enhance_physics_content(self, content: Union[str, Dict[str, Any]]) -> str:
         """
         Enhance content for better embedding quality
@@ -176,6 +192,10 @@ class PhysicsVectorDatabase:
         """
         logger.info(f"🚀 Adding {len(content_items)} physics content items to vector database")
         start_time = time.time()
+        
+        # Ensure the collection exists before adding content
+        if self.qdrant_client:
+            await self._ensure_collection_exists()
         
         successful_additions = 0
         failed_additions = 0
@@ -297,16 +317,30 @@ class PhysicsVectorDatabase:
             'metadata': physics_content.metadata or {}
         }
         
-        # Store point in Qdrant using the correct method
-        physics_items = [{
-            'id': physics_content.id,
-            'content': physics_content.content,
-            'topic': physics_content.topic,
-            'difficulty': physics_content.difficulty_level,
-            'title': physics_content.title,
-            'embedding': physics_content.embedding
-        }]
-        await self.qdrant_client.add_physics_content(physics_items)
+        # Store point in Qdrant using add_points (raw QdrantClient method)
+        point = {
+            "id": physics_content.id,
+            "vector": physics_content.embedding,
+            "payload": payload
+        }
+        
+        # Check if client has add_physics_content (PhysicsVectorDB) or add_points (QdrantClient)
+        if hasattr(self.qdrant_client, 'add_physics_content'):
+            # PhysicsVectorDB wrapper
+            physics_items = [{
+                'id': physics_content.id,
+                'content': physics_content.content,
+                'topic': physics_content.topic,
+                'difficulty': physics_content.difficulty_level,
+                'title': physics_content.title,
+                'embedding': physics_content.embedding
+            }]
+            await self.qdrant_client.add_physics_content(physics_items)
+        elif hasattr(self.qdrant_client, 'add_points'):
+            # Raw QdrantClient
+            await self.qdrant_client.add_points(self.collection_name, [point])
+        else:
+            logger.warning("⚠️  Qdrant client has no add_points or add_physics_content method")
     
     async def search_physics_content(self, 
                                    query: str,
@@ -314,6 +348,7 @@ class PhysicsVectorDatabase:
                                    topic_filter: Optional[str] = None,
                                    difficulty_filter: Optional[str] = None,
                                    content_type_filter: Optional[str] = None,
+                                   user_id: Optional[str] = None,
                                    min_similarity: float = 0.3) -> SearchResponse:
         """
         Search for similar physics content using vector similarity
@@ -324,6 +359,7 @@ class PhysicsVectorDatabase:
             topic_filter: Filter by physics topic
             difficulty_filter: Filter by difficulty level
             content_type_filter: Filter by content type
+            user_id: Filter by user_id (for uploaded materials)
             min_similarity: Minimum similarity threshold
             
         Returns:
@@ -331,6 +367,10 @@ class PhysicsVectorDatabase:
         """
         logger.info(f"🔍 Searching for physics content: '{query[:50]}...'")
         search_start_time = time.time()
+        
+        # Ensure the collection exists before searching
+        if self.qdrant_client:
+            await self._ensure_collection_exists()
         
         try:
             # Generate embedding for query
@@ -358,6 +398,8 @@ class PhysicsVectorDatabase:
                 search_filters['difficulty_level'] = difficulty_filter  
             if content_type_filter:
                 search_filters['content_type'] = content_type_filter
+            if user_id:
+                search_filters['user_id'] = user_id
             
             # Perform vector search (if qdrant_client available)
             search_results = []
@@ -409,43 +451,79 @@ class PhysicsVectorDatabase:
         if not self.qdrant_client:
             return []
         
-        # Build Qdrant filter
-        qdrant_filter = None
-        if filters:
-            conditions = []
-            for key, value in filters.items():
-                conditions.append({
-                    'key': key,
-                    'match': {'value': value}
-                })
+        # Check what type of client we have and call the appropriate method
+        if hasattr(self.qdrant_client, 'search_physics_content'):
+            # PhysicsVectorDB wrapper - use the high-level method
+            search_result = await self.qdrant_client.search_physics_content(
+                query=query_text,
+                limit=limit,
+                score_threshold=min_similarity,
+                filters=filters
+            )
+        elif hasattr(self.qdrant_client, 'search_points'):
+            # Raw QdrantClient - use the low-level method
+            # Build Qdrant filter conditions
+            filter_conditions = None
+            if filters:
+                conditions = []
+                for key, value in filters.items():
+                    # Handle metadata fields (user_id is in metadata)
+                    if key in ['user_id', 'material_id']:
+                        conditions.append({
+                            'key': f'metadata.{key}',
+                            'match': {'value': value}
+                        })
+                    else:
+                        conditions.append({
+                            'key': key,
+                            'match': {'value': value}
+                        })
+                
+                if conditions:
+                    filter_conditions = {'must': conditions}
             
-            if conditions:
-                qdrant_filter = {'must': conditions}
-        
-        # Perform search using the correct method
-        search_result = await self.qdrant_client.search_physics_content(
-            query=query_text,
-            limit=limit
-        )
+            # Search in Qdrant using raw client
+            search_result = await self.qdrant_client.search_points(
+                self.collection_name, 
+                query_vector, 
+                limit, 
+                min_similarity,
+                filter_conditions
+            )
+            
+            # Format results from raw client to match expected format
+            formatted_results = []
+            for result in search_result:
+                formatted_result = {
+                    'id': result['id'],
+                    'score': result['score'],
+                    **result['payload']
+                }
+                formatted_results.append(formatted_result)
+            search_result = formatted_results
+        else:
+            logger.error("❌ Qdrant client has no compatible search method")
+            return []
         
         # Convert results to SearchResult objects
         results = []
         for i, point in enumerate(search_result):
+            # point is a dict with keys: id, score, and payload fields flattened
             physics_content = PhysicsContent(
-                id=point.payload['id'],
-                title=point.payload['title'],
-                content=point.payload['content'],
-                topic=point.payload['topic'],
-                subtopic=point.payload.get('subtopic'),
-                difficulty_level=point.payload['difficulty_level'],
-                content_type=point.payload['content_type'],
-                source=point.payload.get('source'),
-                metadata=point.payload.get('metadata', {})
+                id=point.get('id'),
+                title=point.get('title', ''),
+                content=point.get('content', ''),
+                topic=point.get('topic', ''),
+                subtopic=point.get('subtopic'),
+                difficulty_level=point.get('difficulty_level', 'intermediate'),
+                content_type=point.get('content_type', 'concept'),
+                source=point.get('source'),
+                metadata=point.get('metadata', {})
             )
             
             search_result_obj = SearchResult(
                 content=physics_content,
-                similarity_score=point.score,
+                similarity_score=point.get('score', 0.0),
                 rank=i + 1
             )
             results.append(search_result_obj)

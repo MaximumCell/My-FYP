@@ -18,6 +18,7 @@ trained_classifiers
 node_modules
 .env
 .env.local
+.pytest_cache
 
 # Editor directories and files
 .vscode/*
@@ -35,3 +36,9 @@ implementation-plan.txt
 plan.txt
 *_PLAN.md
 *_IMPLEMENTATION_PLAN.md
+
+# Runtime / generated artifacts
+backend/venv/
+nohup.out
+backend/nohup.out
+backend/static/generated_images/

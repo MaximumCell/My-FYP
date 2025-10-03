@@ -77,16 +77,19 @@ export interface QuickAskResponse {
   context_items_used?: number;
 }
 
-export interface MaterialUpload {
+interface BookInfo {
+  title: string;
+  author: string;
+  edition: string;
+  chapter: string;
+}
+
+interface MaterialUpload {
   file: File;
   title: string;
-  material_type: 'notes' | 'textbook_chapter' | 'reference';
-  book_info?: {
-    title?: string;
-    author?: string;
-    edition?: string;
-    chapter?: string;
-  };
+  material_type: string;
+  user_id?: string;
+  book_info?: BookInfo;
 }
 
 export interface Material {
@@ -123,6 +126,25 @@ export interface PhysicsStats {
       average_context_relevance: number;
     };
   };
+}
+
+export interface DiagramRequest {
+  description: string;
+  diagram_type?: 'force' | 'circuit' | 'wave' | 'energy' | 'motion' | 'field' | 'vector' | 'graph' | 'general';
+  style?: 'educational' | 'technical' | 'sketch' | 'colorful' | 'minimal';
+  include_labels?: boolean;
+  session_id?: string;
+}
+
+export interface DiagramResponse {
+  success: boolean;
+  image_base64?: string;
+  image_url?: string;
+  explanation?: string;
+  diagram_type?: string;
+  style?: string;
+  timestamp?: string;
+  error?: string;
 }
 
 // ============================================
@@ -177,19 +199,33 @@ export const getPhysicsStats = async (): Promise<PhysicsStats> => {
   return response.data;
 };
 
+/**
+ * Generate physics diagram using AI
+ */
+export const generateDiagram = async (
+  data: DiagramRequest
+): Promise<DiagramResponse> => {
+  const response = await api.post('/api/physics/generate-diagram', data);
+  return response.data;
+};
+
 // ============================================
 // Learning Materials API
 // ============================================
 
 /**
- * Upload physics learning material (PDF/images)
+ * Upload physics learning material (PDF/images/DOCX/PPTX)
  */
 export const uploadMaterial = async (data: MaterialUpload): Promise<any> => {
   const formData = new FormData();
   formData.append('file', data.file);
   formData.append('title', data.title);
   formData.append('material_type', data.material_type);
-  
+
+  // Add user_id - in production this would come from auth context
+  // For now, use a default user_id
+  formData.append('user_id', data.user_id || 'default_user');
+
   if (data.book_info) {
     formData.append('book_info', JSON.stringify(data.book_info));
   }
@@ -221,8 +257,10 @@ export const getMaterial = async (materialId: string): Promise<Material> => {
 /**
  * Delete material
  */
-export const deleteMaterial = async (materialId: string): Promise<any> => {
-  const response = await api.delete(`/api/materials/${materialId}`);
+export const deleteMaterial = async (materialId: string, userId?: string): Promise<any> => {
+  const response = await api.delete(`/api/materials/${materialId}`, {
+    params: { user_id: userId },
+  });
   return response.data;
 };
 

@@ -45,7 +45,7 @@ except Exception:
 materials_bp = Blueprint('materials_bp', __name__)
 
 
-ALLOWED_EXT = {'.pdf', '.png', '.jpg', '.jpeg', '.tiff'}
+ALLOWED_EXT = {'.pdf', '.png', '.jpg', '.jpeg', '.tiff', '.docx', '.pptx'}
 
 
 def allowed_filename(filename: str) -> bool:
@@ -57,19 +57,25 @@ def allowed_filename(filename: str) -> bool:
 def upload_material():
     """Upload a user material, run OCR and save metadata to DB."""
     if 'file' not in request.files:
+        current_app.logger.error('Upload failed: No file part in request')
         return jsonify({'success': False, 'error': 'No file part'}), 400
 
     f = request.files['file']
     if f.filename == '':
+        current_app.logger.error('Upload failed: No filename provided')
         return jsonify({'success': False, 'error': 'No selected file'}), 400
 
     filename = secure_filename(f.filename)
     if not allowed_filename(filename):
-        return jsonify({'success': False, 'error': 'Invalid file type'}), 400
+        current_app.logger.error(f'Upload failed: Invalid file type - {filename}')
+        return jsonify({'success': False, 'error': f'Invalid file type. Allowed: {", ".join(ALLOWED_EXT)}'}), 400
 
     user_id = request.headers.get('X-User-ID') or request.form.get('user_id')
     if not user_id:
+        current_app.logger.error('Upload failed: Missing user_id')
         return jsonify({'success': False, 'error': 'Missing user id'}), 400
+    
+    current_app.logger.info(f'Processing upload: {filename} for user {user_id}')
 
     # Save to temporary file
     tmpdir = tempfile.mkdtemp()
@@ -108,27 +114,56 @@ def upload_material():
         return jsonify({'success': False, 'error': 'DB insert failed'}), 500
 
     # Fire-and-forget indexing: process OCR text and index chunks in background
-    try:
-        # Only attempt background indexing if function is available
-        if 'process_and_index_text' in globals() and process_and_index_text:
-            import concurrent.futures
-            import asyncio
+    # Use a thread pool to run async indexing without blocking the response
+    text_to_index = doc.get('content', '')
+    
+    if text_to_index and text_to_index.strip():
+        try:
+            if 'process_and_index_text' in globals() and process_and_index_text:
+                import concurrent.futures
+                import asyncio
+                import threading
 
-            text_to_index = doc.get('content', '')
-            # Note: we don't await this; run in executor to avoid blocking HTTP response
-            loop = asyncio.get_event_loop()
+                # Prepare material metadata for better search results
+                material_metadata = {
+                    'title': doc.get('title'),
+                    'material_type': doc.get('material_type'),
+                    'user_id': user_id,
+                    'file_name': filename,
+                    'material_id': inserted_id
+                }
 
-            def _run_index():
-                try:
-                    asyncio.run(process_and_index_text(text_to_index, qdrant_client=None))
-                except Exception:
-                    current_app.logger.exception('Background indexing failed')
+                def _run_index():
+                    """Run indexing in a new event loop in a separate thread"""
+                    try:
+                        # Create a new event loop for this thread
+                        new_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(new_loop)
+                        
+                        # Run the async function with metadata
+                        new_loop.run_until_complete(
+                            process_and_index_text(
+                                text_to_index, 
+                                qdrant_client=None,
+                                material_metadata=material_metadata
+                            )
+                        )
+                        
+                        new_loop.close()
+                        current_app.logger.info(f'✅ Background indexing completed for material {inserted_id}')
+                    except Exception as e:
+                        current_app.logger.exception(f'❌ Background indexing failed for material {inserted_id}')
 
-            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-            executor.submit(_run_index)
-
-    except Exception:
-        current_app.logger.exception('Failed to start background indexing')
+                # Submit to thread pool
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                executor.submit(_run_index)
+                current_app.logger.info(f'🔄 Background indexing started for material {inserted_id}')
+            else:
+                current_app.logger.warning('⚠️ Content extractor not available - skipping indexing')
+        except Exception as e:
+            current_app.logger.exception('Failed to start background indexing')
+    else:
+        current_app.logger.warning(f'⚠️ No text content to index for material {inserted_id}')
 
     return jsonify({'success': True, 'id': inserted_id, 'processing_status': processing_status}), 201
 
@@ -231,23 +266,50 @@ def process_material(material_id):
         if not material:
             return jsonify({'success': False, 'error': 'Material not found'}), 404
         
-        # Trigger background processing
+        # Trigger background processing with new event loop pattern
+        text_to_index = material.get('content', '')
+        
+        if not text_to_index or not text_to_index.strip():
+            return jsonify({'success': False, 'error': 'No content to process'}), 400
+        
         if process_and_index_text:
             import concurrent.futures
             import asyncio
             
-            text_to_index = material.get('content', '')
+            # Prepare material metadata
+            material_metadata = {
+                'title': material.get('title'),
+                'material_type': material.get('material_type'),
+                'user_id': user_id,
+                'file_name': material.get('upload_metadata', {}).get('file_name', ''),
+                'material_id': material_id
+            }
             
             def _run_index():
                 try:
-                    asyncio.run(process_and_index_text(text_to_index, qdrant_client=None))
-                    # Update processing status
+                    # Create new event loop for this thread
+                    new_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(new_loop)
+                    
+                    new_loop.run_until_complete(
+                        process_and_index_text(
+                            text_to_index, 
+                            qdrant_client=None,
+                            material_metadata=material_metadata
+                        )
+                    )
+                    
+                    new_loop.close()
+                    current_app.logger.info(f'✅ Reprocessing completed for material {material_id}')
+                    
+                    # Update processing status to completed
                     col.update_one(
                         {'_id': ObjectId(material_id)},
                         {'$set': {'upload_metadata.processing_status': 'completed'}}
                     )
-                except Exception:
-                    current_app.logger.exception('Background indexing failed')
+                except Exception as e:
+                    current_app.logger.exception(f'❌ Reprocessing failed for material {material_id}')
+                    # Update processing status to failed
                     col.update_one(
                         {'_id': ObjectId(material_id)},
                         {'$set': {'upload_metadata.processing_status': 'failed'}}

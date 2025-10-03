@@ -30,6 +30,7 @@ import {
   ChevronUp,
   Sparkles,
   Brain,
+  Image,
 } from 'lucide-react';
 import { usePhysicsChat, ChatMessage } from '@/hooks/use-physics-chat';
 import { LatexRenderer } from '@/components/latex-renderer';
@@ -42,6 +43,7 @@ export function PhysicsAIChat() {
     preferences,
     askQuestion,
     requestDerivation,
+    requestDiagram,
     clearChat,
     updatePreferences,
   } = usePhysicsChat();
@@ -59,7 +61,28 @@ export function PhysicsAIChat() {
 
   const handleSend = () => {
     if (input.trim() && !isLoading) {
-      askQuestion(input.trim());
+      const lowerInput = input.toLowerCase();
+
+      // Check if user is requesting a diagram/image
+      const diagramKeywords = [
+        'draw', 'diagram', 'image', 'picture', 'visualiz', 'illustrat',
+        'sketch', 'show me', 'generate', 'create'
+      ];
+      const physicsVisuals = [
+        'field', 'circuit', 'force', 'vector', 'wave', 'motion',
+        'energy', 'graph', 'electric', 'magnetic'
+      ];
+
+      const hasDiagramKeyword = diagramKeywords.some(kw => lowerInput.includes(kw));
+      const hasPhysicsVisual = physicsVisuals.some(kw => lowerInput.includes(kw));
+
+      if (hasDiagramKeyword || (hasPhysicsVisual && lowerInput.includes('of'))) {
+        // User wants a diagram
+        requestDiagram(input.trim());
+      } else {
+        // Regular question
+        askQuestion(input.trim());
+      }
       setInput('');
     }
   };
@@ -259,7 +282,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                 )}
                 {message.metadata.sources_used !== undefined && (
                   <Badge variant="outline" className="text-xs">
-                    {message.metadata.sources_used} sources
+                    {Array.isArray(message.metadata.sources_used)
+                      ? message.metadata.sources_used.length
+                      : message.metadata.sources_used} sources
                   </Badge>
                 )}
                 {message.metadata.quality_score !== undefined && (
@@ -374,22 +399,67 @@ function MessageBubble({ message }: { message: ChatMessage }) {
               </div>
             )}
 
+            {/* Generated Diagram */}
+            {message.diagram && (message.diagram.image_base64 || message.diagram.image_url) && (
+              <div className="mt-3 p-3 bg-background/50 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <Image className="h-4 w-4" />
+                  <span className="text-sm font-medium">
+                    {message.diagram.diagram_type ? `${message.diagram.diagram_type} diagram` : 'Generated Diagram'}
+                  </span>
+                </div>
+                <div className="relative rounded-lg overflow-hidden border border-border">
+                  <img
+                    src={
+                      message.diagram.image_url
+                        ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}${message.diagram.image_url}`
+                        : `data:image/png;base64,${message.diagram.image_base64}`
+                    }
+                    alt={message.diagram.explanation || 'Physics diagram'}
+                    className="w-full h-auto"
+                    onError={(e) => {
+                      // Fallback to base64 if URL fails
+                      if (message.diagram?.image_base64) {
+                        e.currentTarget.src = `data:image/png;base64,${message.diagram.image_base64}`;
+                      }
+                    }}
+                  />
+                </div>
+                {message.diagram.explanation && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {message.diagram.explanation}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Citations */}
             {message.citations && message.citations.length > 0 && (
               <div className="mt-3 pt-3 border-t border-primary/10">
                 <div className="text-xs font-medium mb-2">Sources:</div>
                 <div className="space-y-1">
-                  {message.citations.map((citation, i) => (
-                    <div key={i} className="text-xs text-muted-foreground">
-                      • {citation.title}
-                      {citation.author && ` - ${citation.author}`}
-                      {citation.confidence && (
-                        <span className="ml-2">
-                          ({(citation.confidence * 100).toFixed(0)}% relevant)
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                  {message.citations.map((citation: any, i: number) => {
+                    // Support multiple citation shapes coming from backend
+                    const title = citation?.title || citation?.citation || citation?.citation_text || citation?.citation_text || citation?.source_id || 'Untitled';
+                    const author = citation?.author || citation?.metadata?.author || null;
+                    const conf = typeof citation?.confidence === 'number'
+                      ? citation.confidence
+                      : (typeof citation?.confidence === 'string' && !isNaN(Number(citation.confidence)))
+                        ? Number(citation.confidence)
+                        : (typeof citation?.confidence === 'undefined' && typeof citation?.confidence !== 'number')
+                          ? (citation?.confidence || 0)
+                          : 0;
+
+                    return (
+                      <div key={i} className="text-xs text-muted-foreground">
+                        • {title}
+                        {author && ` - ${author}`}
+                        {conf !== undefined && conf !== null && (
+                          <span className="ml-2">({(conf * 100).toFixed(0)}% relevant)</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

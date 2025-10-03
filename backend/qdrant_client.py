@@ -66,6 +66,9 @@ class QdrantClient:
                 if response.status_code in [200, 201]:
                     logger.info(f"✅ Created collection: {collection_name}")
                     return True
+                elif response.status_code == 409:
+                    logger.info(f"✅ Collection already exists: {collection_name}")
+                    return True  # Collection exists, which is fine
                 else:
                     logger.error(f"Failed to create collection: {response.status_code} - {response.text}")
                     return False
@@ -98,8 +101,9 @@ class QdrantClient:
             return False
     
     async def search_points(self, collection_name: str, query_vector: List[float], 
-                          limit: int = 5, score_threshold: float = 0.0) -> List[Dict[str, Any]]:
-        """Search for similar vectors"""
+                          limit: int = 5, score_threshold: float = 0.0, 
+                          filter_conditions: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """Search for similar vectors with optional filtering"""
         try:
             search_payload = {
                 "vector": query_vector,
@@ -108,7 +112,12 @@ class QdrantClient:
                 "score_threshold": score_threshold
             }
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            # Add filter if provided
+            if filter_conditions:
+                search_payload["filter"] = filter_conditions
+            
+            # Use shorter timeout to prevent hanging
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 response = await client.post(
                     f"{self.url}/collections/{collection_name}/points/search",
                     json=search_payload,
@@ -119,11 +128,20 @@ class QdrantClient:
                     results = response.json()
                     return results.get("result", [])
                 else:
-                    logger.error(f"Search failed: {response.status_code} - {response.text}")
+                    error_msg = f"Search failed: {response.status_code} - {response.text}"
+                    logger.error(error_msg)
                     return []
                     
+        except asyncio.TimeoutError as e:
+            logger.error(f"Search timeout: {e}")
+            return []
+        except httpx.TimeoutException as e:
+            logger.error(f"HTTP timeout during search: {e}")
+            return []
         except Exception as e:
+            import traceback
             logger.error(f"Search error: {e}")
+            logger.error(f"Search traceback: {traceback.format_exc()}")
             return []
     
     async def delete_points(self, collection_name: str, point_ids: List[str]) -> bool:
@@ -164,29 +182,54 @@ class QdrantClient:
 class PhysicsVectorDB:
     """Physics-specific vector database using Qdrant"""
     
-    def __init__(self, qdrant_url: str, api_key: Optional[str] = None):
+    def __init__(self, qdrant_url: str, api_key: Optional[str] = None, embedding_service=None):
         self.qdrant = QdrantClient(qdrant_url, api_key)
         self.collection_name = "physics_knowledge"
-        self.embedding_model = None
-        self._initialize_embedding_model()
+        self.embedding_service = embedding_service
+        self._initialize_embedding_service()
     
-    def _initialize_embedding_model(self):
-        """Initialize a simple embedding model (optional - you can generate embeddings externally)"""
-        try:
-            # Only import if needed - fallback to external embedding generation
-            from sentence_transformers import SentenceTransformer
-            self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info("✅ Embedding model loaded")
-        except ImportError:
-            logger.info("🔧 No embedding model - will accept pre-computed embeddings")
-            self.embedding_model = None
+    def _initialize_embedding_service(self):
+        """Initialize Google embedding service for consistency with indexing"""
+        if self.embedding_service is None:
+            try:
+                # Try different import paths for embedding service
+                embedding_service = None
+                
+                # Try package import first
+                try:
+                    from backend.ai.embedding_service import get_embedding_service
+                    embedding_service = get_embedding_service()
+                    logger.info("✅ Embedding service imported from backend.ai.embedding_service")
+                except ImportError:
+                    # Try direct import
+                    try:
+                        from ai.embedding_service import get_embedding_service
+                        embedding_service = get_embedding_service()
+                        logger.info("✅ Embedding service imported from ai.embedding_service")
+                    except ImportError:
+                        logger.warning("⚠️ Could not import embedding service from either path")
+                        
+                if embedding_service:
+                    self.embedding_service = embedding_service
+                    logger.info("✅ Embedding service initialized with model: text-embedding-004")
+                else:
+                    self.embedding_service = None
+                    logger.warning("⚠️ Embedding service could not be initialized")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ Could not initialize embedding service: {e}")
+                logger.info("🔧 No embedding model - will accept pre-computed embeddings")
+                self.embedding_service = None
     
-    def generate_embedding(self, text: str) -> List[float]:
-        """Generate embedding for text (if model is available)"""
-        if self.embedding_model:
-            return self.embedding_model.encode(text).tolist()
+    async def generate_embedding(self, text: str) -> List[float]:
+        """Generate embedding for text using Google's text-embedding-004"""
+        if self.embedding_service:
+            result = await self.embedding_service.generate_single_embedding(text)
+            if result.error:
+                raise ValueError(f"Embedding generation failed: {result.error}")
+            return result.embedding
         else:
-            raise ValueError("No embedding model available - please provide pre-computed embeddings")
+            raise ValueError("No embedding service available - please provide pre-computed embeddings")
     
     async def initialize(self) -> bool:
         """Initialize the physics vector database"""
@@ -196,8 +239,8 @@ class PhysicsVectorDB:
                 logger.error("❌ Qdrant service is not healthy")
                 return False
             
-            # Create physics collection
-            success = await self.qdrant.create_collection(self.collection_name, 384)
+            # Create physics collection with 768 dimensions (Google text-embedding-004)
+            success = await self.qdrant.create_collection(self.collection_name, 768)
             if success:
                 logger.info("✅ Physics vector database initialized")
                 return True
@@ -238,10 +281,10 @@ class PhysicsVectorDB:
                 # Generate embedding
                 if 'embedding' in item:
                     vector = item['embedding']
-                elif self.embedding_model:
-                    vector = self.generate_embedding(searchable_text)
+                elif self.embedding_service:
+                    vector = await self.generate_embedding(searchable_text)
                 else:
-                    logger.error("No embedding provided and no model available")
+                    logger.error("No embedding provided and no service available")
                     return False
                 
                 # Create point
@@ -263,22 +306,53 @@ class PhysicsVectorDB:
             return False
     
     async def search_physics_content(self, query: str, limit: int = 5, 
-                                   score_threshold: float = 0.3) -> List[Dict[str, Any]]:
-        """Search for physics content"""
+                                   score_threshold: float = 0.3,
+                                   filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """Search for physics content with optional filtering"""
         try:
-            # Generate query embedding
-            if self.embedding_model:
-                query_vector = self.generate_embedding(query)
+            logger.info(f"🔍 Starting search for query: '{query[:50]}...' with filters: {filters}")
+            
+            # Generate query embedding using Google's text-embedding-004
+            if self.embedding_service:
+                logger.info("📊 Generating embedding for query...")
+                query_vector = await self.generate_embedding(query)
+                logger.info(f"✅ Generated embedding vector of size: {len(query_vector)}")
             else:
-                raise ValueError("No embedding model available for query")
+                error_msg = "No embedding service available for query"
+                logger.error(f"❌ {error_msg}")
+                raise ValueError(error_msg)
+            
+            # Build Qdrant filter conditions
+            filter_conditions = None
+            if filters:
+                conditions = []
+                for key, value in filters.items():
+                    # Handle metadata fields (user_id is in metadata)
+                    if key in ['user_id', 'material_id']:
+                        conditions.append({
+                            'key': f'metadata.{key}',
+                            'match': {'value': value}
+                        })
+                    else:
+                        conditions.append({
+                            'key': key,
+                            'match': {'value': value}
+                        })
+                
+                if conditions:
+                    filter_conditions = {'must': conditions}
+                    logger.info(f"🔧 Applied filter conditions: {filter_conditions}")
             
             # Search in Qdrant
+            logger.info(f"🔍 Searching in Qdrant collection '{self.collection_name}'...")
             results = await self.qdrant.search_points(
                 self.collection_name, 
                 query_vector, 
                 limit, 
-                score_threshold
+                score_threshold,
+                filter_conditions
             )
+            logger.info(f"✅ Qdrant search returned {len(results)} results")
             
             # Format results
             formatted_results = []
@@ -290,10 +364,13 @@ class PhysicsVectorDB:
                 }
                 formatted_results.append(formatted_result)
             
+            logger.info(f"✅ Search completed successfully: {len(formatted_results)} formatted results")
             return formatted_results
             
         except Exception as e:
+            import traceback
             logger.error(f"Search failed: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
             return []
     
     async def get_stats(self) -> Dict[str, Any]:
@@ -315,7 +392,7 @@ class PhysicsVectorDB:
             return {'backend': 'qdrant', 'status': 'error', 'error': str(e)}
 
 # Simple factory function
-def create_physics_vector_db(qdrant_url: str = None, api_key: str = None) -> PhysicsVectorDB:
+def create_physics_vector_db(qdrant_url: str = None, api_key: str = None, embedding_service=None) -> PhysicsVectorDB:
     """Create physics vector database instance"""
     
     # Get URL from environment if not provided
@@ -328,7 +405,7 @@ def create_physics_vector_db(qdrant_url: str = None, api_key: str = None) -> Phy
     if not api_key:
         api_key = os.getenv('QDRANT_API_KEY')  # Optional
     
-    return PhysicsVectorDB(qdrant_url, api_key)
+    return PhysicsVectorDB(qdrant_url, api_key, embedding_service)
 
 # Example usage and testing
 async def test_qdrant_deployment():
