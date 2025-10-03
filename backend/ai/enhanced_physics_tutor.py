@@ -367,7 +367,17 @@ class EnhancedPhysicsAITutor:
                 else:
                     self.stats['average_context_relevance'] = avg_relevance
             
-            return search_response.results
+            # Filter to only return high-quality context items to avoid irrelevant user materials
+            HIGH_SIM_THRESHOLD = 0.6
+            filtered_results = [r for r in (search_response.results or []) if getattr(r, 'similarity_score', 0) >= HIGH_SIM_THRESHOLD]
+
+            if filtered_results:
+                logger.info(f"🔎 Returning {len(filtered_results)} high-quality context items (>= {HIGH_SIM_THRESHOLD})")
+                return filtered_results
+            else:
+                # No high-quality matches found -- return empty to avoid using weak user materials
+                logger.info("🔎 No high-quality context found; returning no context to avoid irrelevant citations")
+                return []
             
         except Exception as e:
             logger.error(f"Context retrieval failed: {e}")

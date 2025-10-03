@@ -152,7 +152,49 @@ def format_citation(source: Dict[str, Any]) -> Dict[str, Any]:
 
 def generate_citations(sources: List[Dict[str, Any]], max_items: int = 5) -> List[Dict[str, Any]]:
     """Take prioritized sources and return a list of formatted citations (top N)."""
-    citations = []
+    # Normalize a variety of internal source shapes into a stable citation object
+    citations: List[Dict[str, Any]] = []
     for s in (sources or [])[:max_items]:
-        citations.append(format_citation(s))
+        try:
+            # Try common places for title / text
+            title = None
+            if isinstance(s, dict):
+                title = s.get('title') or s.get('citation') or s.get('citation_text')
+                meta = s.get('metadata') or s.get('meta') or {}
+                if not title and isinstance(meta, dict):
+                    title = meta.get('title') or meta.get('name') or meta.get('excerpt')
+
+            if not title:
+                title = str(s.get('id') if isinstance(s, dict) and s.get('id') is not None else 'Untitled')
+
+            # Confidence/score (accept 'score', 'confidence' or 'similarity_score')
+            conf = 0.0
+            if isinstance(s, dict):
+                conf = float(
+                    s.get('score',
+                          s.get('confidence',
+                                s.get('similarity_score', 0.0))) or 0.0
+                )
+
+            # Author/reference info if available
+            author = None
+            reference = None
+            source_type = None
+            if isinstance(s, dict):
+                source_type = s.get('type') or (s.get('metadata') or {}).get('type')
+                meta = s.get('metadata') or {}
+                author = s.get('author') or meta.get('author')
+                reference = s.get('url') or meta.get('url') or meta.get('reference')
+
+            citations.append({
+                'source_type': source_type or 'unknown',
+                'title': title,
+                'author': author,
+                'reference': reference,
+                'confidence': conf
+            })
+        except Exception:
+            # Skip malformed source
+            continue
+
     return citations

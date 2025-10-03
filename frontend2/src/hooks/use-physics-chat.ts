@@ -39,6 +39,7 @@ export interface ChatMessage {
     title: string;
     author?: string;
     reference?: string;
+    confidence?: number;
   }>;
   steps?: Array<{ step_number: number; content: string }>;
   diagram?: {

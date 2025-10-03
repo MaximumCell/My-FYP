@@ -282,7 +282,9 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                 )}
                 {message.metadata.sources_used !== undefined && (
                   <Badge variant="outline" className="text-xs">
-                    {message.metadata.sources_used} sources
+                    {Array.isArray(message.metadata.sources_used)
+                      ? message.metadata.sources_used.length
+                      : message.metadata.sources_used} sources
                   </Badge>
                 )}
                 {message.metadata.quality_score !== undefined && (
@@ -436,17 +438,28 @@ function MessageBubble({ message }: { message: ChatMessage }) {
               <div className="mt-3 pt-3 border-t border-primary/10">
                 <div className="text-xs font-medium mb-2">Sources:</div>
                 <div className="space-y-1">
-                  {message.citations.map((citation, i) => (
-                    <div key={i} className="text-xs text-muted-foreground">
-                      • {citation.title}
-                      {citation.author && ` - ${citation.author}`}
-                      {citation.confidence && (
-                        <span className="ml-2">
-                          ({(citation.confidence * 100).toFixed(0)}% relevant)
-                        </span>
-                      )}
-                    </div>
-                  ))}
+                  {message.citations.map((citation: any, i: number) => {
+                    // Support multiple citation shapes coming from backend
+                    const title = citation?.title || citation?.citation || citation?.citation_text || citation?.citation_text || citation?.source_id || 'Untitled';
+                    const author = citation?.author || citation?.metadata?.author || null;
+                    const conf = typeof citation?.confidence === 'number'
+                      ? citation.confidence
+                      : (typeof citation?.confidence === 'string' && !isNaN(Number(citation.confidence)))
+                        ? Number(citation.confidence)
+                        : (typeof citation?.confidence === 'undefined' && typeof citation?.confidence !== 'number')
+                          ? (citation?.confidence || 0)
+                          : 0;
+
+                    return (
+                      <div key={i} className="text-xs text-muted-foreground">
+                        • {title}
+                        {author && ` - ${author}`}
+                        {conf !== undefined && conf !== null && (
+                          <span className="ml-2">({(conf * 100).toFixed(0)}% relevant)</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
