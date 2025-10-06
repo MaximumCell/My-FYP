@@ -20,5 +20,6 @@ joblib
 matplotlib
 seaborn
 plotly
+scikit-learn>=1.2.2
 # Optional: include TF CPU if you need ML in this service. Comment out to reduce image size and build time.
 tensorflow-cpu==2.13.0
