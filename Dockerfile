@@ -23,9 +23,15 @@ WORKDIR /app
 
 # Copy only requirements first to leverage Docker cache
 COPY backend/requirements.txt /app/backend/requirements.txt
+COPY backend/requirements-prod.txt /app/backend/requirements-prod.txt
 
 RUN python -m pip install --upgrade pip setuptools wheel
-RUN pip install --no-cache-dir -r /app/backend/requirements.txt
+# Prefer a lean production requirements file if it exists to speed up builds
+RUN if [ -f /app/backend/requirements-prod.txt ]; then \
+    pip install --no-cache-dir -r /app/backend/requirements-prod.txt; \
+    else \
+    pip install --no-cache-dir -r /app/backend/requirements.txt; \
+    fi
 
 # Copy the rest of the project
 COPY . /app
