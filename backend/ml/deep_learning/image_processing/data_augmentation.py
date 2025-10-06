@@ -10,8 +10,8 @@ import logging
 try:
     import numpy as np
     from PIL import Image, ImageEnhance, ImageFilter, ImageOps
-    import tensorflow as tf
-    HAS_DEPS = True
+    from utils.lazy_tf import tf, is_available as tf_is_available
+    HAS_DEPS = tf_is_available()
 except ImportError:
     HAS_DEPS = False
     np = None
@@ -56,7 +56,7 @@ class DataAugmentation:
         
         self.config = {**default_config, **(config or {})}
     
-    def augment_image_pil(self, image: Image.Image) -> Image.Image:
+    def augment_image_pil(self, image: "Image.Image") -> "Image.Image":
         """
         Apply augmentation to a PIL Image
         
@@ -149,7 +149,7 @@ class DataAugmentation:
         
         return augmented_array
     
-    def create_tf_augmentation_layer(self) -> tf.keras.Sequential:
+    def create_tf_augmentation_layer(self) -> "tf.keras.Sequential":
         """
         Create TensorFlow/Keras augmentation layers
         
@@ -195,12 +195,12 @@ class DataAugmentation:
         
         return tf.keras.Sequential(layers)
     
-    def _apply_rotation(self, img: Image.Image) -> Image.Image:
+    def _apply_rotation(self, img: "Image.Image") -> "Image.Image":
         """Apply random rotation"""
         angle = random.uniform(-self.config['rotation_range'], self.config['rotation_range'])
         return img.rotate(angle, fillcolor=(128, 128, 128) if img.mode == 'RGB' else 128)
     
-    def _apply_shift(self, img: Image.Image) -> Image.Image:
+    def _apply_shift(self, img: "Image.Image") -> "Image.Image":
         """Apply random translation"""
         width, height = img.size
         
@@ -209,12 +209,12 @@ class DataAugmentation:
         
         return img.transform(img.size, Image.AFFINE, (1, 0, dx, 0, 1, dy))
     
-    def _apply_shear(self, img: Image.Image) -> Image.Image:
+    def _apply_shear(self, img: "Image.Image") -> "Image.Image":
         """Apply random shear transformation"""
         shear = random.uniform(-self.config['shear_range'], self.config['shear_range'])
         return img.transform(img.size, Image.AFFINE, (1, shear, 0, 0, 1, 0))
     
-    def _apply_zoom(self, img: Image.Image) -> Image.Image:
+    def _apply_zoom(self, img: "Image.Image") -> "Image.Image":
         """Apply random zoom"""
         zoom = 1 + random.uniform(-self.config['zoom_range'], self.config['zoom_range'])
         
@@ -238,19 +238,19 @@ class DataAugmentation:
             new_img.paste(resized, (left, top))
             return new_img
     
-    def _apply_brightness(self, img: Image.Image) -> Image.Image:
+    def _apply_brightness(self, img: "Image.Image") -> "Image.Image":
         """Apply random brightness adjustment"""
         factor = 1 + random.uniform(-self.config['brightness_range'], self.config['brightness_range'])
         enhancer = ImageEnhance.Brightness(img)
         return enhancer.enhance(factor)
     
-    def _apply_contrast(self, img: Image.Image) -> Image.Image:
+    def _apply_contrast(self, img: "Image.Image") -> "Image.Image":
         """Apply random contrast adjustment"""
         factor = 1 + random.uniform(-self.config['contrast_range'], self.config['contrast_range'])
         enhancer = ImageEnhance.Contrast(img)
         return enhancer.enhance(factor)
     
-    def _apply_saturation(self, img: Image.Image) -> Image.Image:
+    def _apply_saturation(self, img: "Image.Image") -> "Image.Image":
         """Apply random saturation adjustment (RGB only)"""
         if img.mode != 'RGB':
             return img
@@ -259,7 +259,7 @@ class DataAugmentation:
         enhancer = ImageEnhance.Color(img)
         return enhancer.enhance(factor)
     
-    def _apply_hue(self, img: Image.Image) -> Image.Image:
+    def _apply_hue(self, img: "Image.Image") -> "Image.Image":
         """Apply random hue shift (RGB only)"""
         if img.mode != 'RGB':
             return img
@@ -278,12 +278,12 @@ class DataAugmentation:
         hsv_adjusted = Image.merge('HSV', (h, s, v))
         return hsv_adjusted.convert('RGB')
     
-    def _apply_blur(self, img: Image.Image) -> Image.Image:
+    def _apply_blur(self, img: "Image.Image") -> "Image.Image":
         """Apply random gaussian blur"""
         radius = random.uniform(0, self.config['blur_range'])
         return img.filter(ImageFilter.GaussianBlur(radius=radius))
     
-    def _apply_sharpen(self, img: Image.Image) -> Image.Image:
+    def _apply_sharpen(self, img: "Image.Image") -> "Image.Image":
         """Apply random sharpening"""
         if random.random() < self.config['sharpen_factor']:
             return img.filter(ImageFilter.SHARPEN)

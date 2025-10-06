@@ -3,7 +3,8 @@
 Provides `get_model(input_shape, output_units=1, config=None)`.
 """
 try:
-    from tensorflow import keras
+    from utils.lazy_tf import tf, is_available as tf_is_available
+    HAS_DEPS = tf_is_available()
 except Exception:
     keras = None
 

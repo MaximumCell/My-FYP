@@ -10,16 +10,11 @@ import json
 from typing import Dict, Any, Tuple, Optional
 import logging
 
-try:
-    import numpy as np
-    import tensorflow as tf
-    from tensorflow import keras
-    HAS_DEPS = True
-except ImportError:
-    HAS_DEPS = False
-    tf = None
-    keras = None
-    np = None
+from utils.lazy_tf import tf, is_available as tf_is_available
+import numpy as np
+
+HAS_DEPS = tf_is_available()
+keras = tf.keras if HAS_DEPS else None
 
 import sys
 import os

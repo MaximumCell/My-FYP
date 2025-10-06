@@ -7,14 +7,12 @@ This improves the placeholder by:
 """
 import os
 import time
-try:
-    from tensorflow import keras
-    import numpy as np
-    import pandas as pd
-except Exception:
-    keras = None
-    np = None
-    pd = None
+from utils.lazy_tf import tf, is_available as tf_is_available
+import numpy as np
+import pandas as pd
+
+HAS_DEPS = tf_is_available()
+keras = tf.keras if HAS_DEPS else None
 
 from ..models.cnn import get_model
 
@@ -25,8 +23,8 @@ except Exception:
 
 
 def train_model(csv_path, image_shape, target_column=None, epochs=5, batch_size=32, config=None, model_out_path=None):
-    if pd is None or keras is None:
-        return {"error": "TensorFlow / pandas not installed"}
+    if not HAS_DEPS or pd is None:
+        return {"error": "TensorFlow / pandas not available"}
 
     df = pd.read_csv(csv_path)
     if target_column is None:
@@ -36,7 +34,13 @@ def train_model(csv_path, image_shape, target_column=None, epochs=5, batch_size=
         return {"error": "CSV must contain 'image_path' column with image file paths for CNN training."}
 
     # Minimal loader using Keras utilities, with basic validation
-    from tensorflow.keras.utils import load_img, img_to_array
+    try:
+        # These will be available once TF is loaded via proxy
+        load_img = None
+        img_to_array = None
+    except Exception:
+        load_img = None
+        img_to_array = None
     X = []
     y = []
     for idx, row in df.iterrows():

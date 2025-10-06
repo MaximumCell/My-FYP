@@ -1,21 +1,19 @@
 """Training wrapper for transformer models with basic validation and timestamped saving."""
 import os
 import time
-try:
-    from tensorflow import keras
-    import numpy as np
-    import pandas as pd
-except Exception:
-    keras = None
-    np = None
-    pd = None
+from utils.lazy_tf import tf, is_available as tf_is_available
+import numpy as np
+import pandas as pd
+
+HAS_DEPS = tf_is_available()
+keras = tf.keras if HAS_DEPS else None
 
 from ..models.transformer import get_model
 
 
 def train_model(csv_path, target_column=None, timesteps=10, epochs=5, batch_size=32, config=None, model_out_path=None):
-    if pd is None or keras is None:
-        return {"error": "TensorFlow / pandas not installed"}
+    if not HAS_DEPS or pd is None:
+        return {"error": "TensorFlow / pandas not available"}
     df = pd.read_csv(csv_path)
     if target_column is None:
         target_column = df.columns[-1]

@@ -2,16 +2,31 @@
 
 Provides `get_model(input_shape, output_units=1, config=None)`.
 """
-try:
-    from tensorflow import keras
-    from tensorflow.keras import layers
-except Exception:
-    keras = None
+from utils.lazy_tf import tf, is_available as tf_is_available
+
+HAS_DEPS = tf_is_available()
+
+
+def _get_layers():
+    if not HAS_DEPS:
+        raise ImportError("TensorFlow not available")
+    return tf.keras.layers
+
+
+def _get_keras():
+    if not HAS_DEPS:
+        raise ImportError("TensorFlow not available")
+    return tf.keras
 
 
 def get_model(input_shape, output_units=1, config=None):
-    if keras is None:
+    """Build a small transformer encoder model lazily using the TF proxy."""
+    if not HAS_DEPS:
         raise RuntimeError("TensorFlow not installed")
+
+    layers = _get_layers()
+    keras = _get_keras()
+
     cfg = config or {}
     d_model = cfg.get('d_model', 64)
     num_heads = cfg.get('num_heads', 4)

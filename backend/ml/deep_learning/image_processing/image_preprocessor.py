@@ -10,8 +10,8 @@ import logging
 try:
     import numpy as np
     from PIL import Image, ImageEnhance, ImageFilter
-    import tensorflow as tf
-    HAS_DEPS = True
+    from utils.lazy_tf import tf, is_available as tf_is_available
+    HAS_DEPS = tf_is_available()
 except ImportError:
     HAS_DEPS = False
     np = None
@@ -114,7 +114,7 @@ class ImagePreprocessor:
                          labels: list, 
                          batch_size: int = 32,
                          shuffle: bool = True,
-                         augment: bool = False) -> tf.data.Dataset:
+                         augment: bool = False) -> "tf.data.Dataset":
         """
         Create a TensorFlow dataset from image paths and labels
         
@@ -157,7 +157,7 @@ class ImagePreprocessor:
         
         return dataset
     
-    def _tf_preprocess_image(self, image_path: tf.Tensor, label: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+    def _tf_preprocess_image(self, image_path: "tf.Tensor", label: "tf.Tensor") -> Tuple["tf.Tensor", "tf.Tensor"]:
         """
         TensorFlow preprocessing function for use with tf.data.Dataset
         
@@ -192,7 +192,7 @@ class ImagePreprocessor:
         
         return image, label
     
-    def _augment_image(self, image: tf.Tensor) -> tf.Tensor:
+    def _augment_image(self, image: "tf.Tensor") -> "tf.Tensor":
         """
         Apply data augmentation to an image tensor
         

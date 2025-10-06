@@ -9,10 +9,11 @@ import logging
 
 try:
     import numpy as np
-    import tensorflow as tf
     from sklearn.model_selection import train_test_split
     from sklearn.preprocessing import LabelEncoder
-    HAS_DEPS = True
+    # Lazy-import tensorflow proxy
+    from utils.lazy_tf import tf, is_available as tf_is_available
+    HAS_DEPS = tf_is_available()
 except ImportError:
     HAS_DEPS = False
     tf = None
@@ -254,7 +255,7 @@ class ImageDatasetGenerator:
                           labels: np.ndarray,
                           batch_size: int,
                           shuffle: bool,
-                          augment: bool = False) -> tf.data.Dataset:
+                          augment: bool = False) -> "tf.data.Dataset":
         """
         Create TensorFlow dataset from paths and labels
         
@@ -295,7 +296,7 @@ class ImageDatasetGenerator:
         
         return dataset
     
-    def _load_and_preprocess_image(self, image_path: tf.Tensor, label: tf.Tensor) -> Tuple[tf.Tensor, tf.Tensor]:
+    def _load_and_preprocess_image(self, image_path: "tf.Tensor", label: "tf.Tensor") -> Tuple["tf.Tensor", "tf.Tensor"]:
         """
         Load and preprocess a single image using TensorFlow operations
         
@@ -325,7 +326,7 @@ class ImageDatasetGenerator:
         
         return image, label
     
-    def _preprocess_batch(self, images: tf.Tensor) -> tf.Tensor:
+    def _preprocess_batch(self, images: "tf.Tensor") -> "tf.Tensor":
         """
         Preprocess a batch of images
         
@@ -347,7 +348,7 @@ class ImageDatasetGenerator:
     
     def create_test_dataset(self,
                            test_images: List[str],
-                           batch_size: int = 32) -> tf.data.Dataset:
+                           batch_size: int = 32) -> "tf.data.Dataset":
         """
         Create dataset for testing/inference (no labels)
         
@@ -373,7 +374,7 @@ class ImageDatasetGenerator:
         
         return dataset
     
-    def _load_and_preprocess_image_no_label(self, image_path: tf.Tensor) -> tf.Tensor:
+    def _load_and_preprocess_image_no_label(self, image_path: "tf.Tensor") -> "tf.Tensor":
         """
         Load and preprocess image without label (for testing)
         

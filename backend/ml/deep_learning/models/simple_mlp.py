@@ -5,7 +5,8 @@ Naming convention: file names and exported functions should mirror previous mode
 """
 
 try:
-    from tensorflow import keras
+    from utils.lazy_tf import tf, is_available as tf_is_available
+    HAS_DEPS = tf_is_available()
     import numpy as np
 except Exception:
     keras = None
