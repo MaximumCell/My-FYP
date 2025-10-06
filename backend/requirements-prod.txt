@@ -4,7 +4,8 @@ requests>=2.28.0
 gunicorn>=20.1.0
 pymongo>=4.0.0
 python-dotenv
-pydantic
+# Use Pydantic v2 to match code that imports BeforeValidator and other v2 APIs
+pydantic>=2.1.0,<3.0.0
 numpy
 scipy
 pillow>=10.0.0
