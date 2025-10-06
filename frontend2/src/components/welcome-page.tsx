@@ -159,6 +159,8 @@ export default function WelcomePage() {
                             imageUrl="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                             imageHint="machine learning dashboard"
                             comingSoon={false}
+                            actionHref="/ml"
+                            actionLabel="Open ML Lab"
                         />
                         <FeatureCard
                             icon={<TestTube className="h-10 w-10 text-primary" />}
@@ -173,6 +175,8 @@ export default function WelcomePage() {
                             imageUrl="https://images.unsplash.com/photo-1636466497217-26a8cbeaf0aa?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                             imageHint="physics simulation visualization"
                             comingSoon={false}
+                            actionHref="/simulation"
+                            actionLabel="Open Simulation"
                         />
                         <FeatureCard
                             icon={<BrainCircuit className="h-10 w-10 text-primary" />}
@@ -186,7 +190,9 @@ export default function WelcomePage() {
                             ]}
                             imageUrl="https://images.unsplash.com/photo-1677442136019-21780ecad995?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
                             imageHint="AI assistant interface"
-                            comingSoon={true}
+                            comingSoon={false}
+                            actionHref="/ai"
+                            actionLabel="Open AI Tutor"
                         />
                     </div>
                 </div>
@@ -247,7 +253,9 @@ function FeatureCard({
     features,
     imageUrl,
     imageHint,
-    comingSoon
+    comingSoon,
+    actionHref,
+    actionLabel
 }: {
     icon: React.ReactNode;
     title: string;
@@ -256,6 +264,8 @@ function FeatureCard({
     imageUrl: string;
     imageHint: string;
     comingSoon: boolean;
+    actionHref?: string;
+    actionLabel?: string;
 }) {
     return (
         <div className="group relative">
@@ -303,14 +313,25 @@ function FeatureCard({
                             ))}
                         </div>
                         <div className="pt-4">
-                            <SignUpButton>
-                                <Button
-                                    size="lg"
-                                    className="w-full md:w-auto shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-                                >
-                                    Get Started &rarr;
-                                </Button>
-                            </SignUpButton>
+                            {actionHref ? (
+                                <Link href={actionHref} className="w-full md:w-auto">
+                                    <Button
+                                        size="lg"
+                                        className="w-full md:w-auto shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                                    >
+                                        {actionLabel ?? 'Open'}
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <SignUpButton>
+                                    <Button
+                                        size="lg"
+                                        className="w-full md:w-auto shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                                    >
+                                        Get Started &rarr;
+                                    </Button>
+                                </SignUpButton>
+                            )}
                         </div>
                     </div>
                 </div>

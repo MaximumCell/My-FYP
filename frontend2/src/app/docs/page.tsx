@@ -154,13 +154,14 @@ const PhysicsLabDocs = () => {
 
                 {/* Main Content */}
                 <Tabs defaultValue="overview" className="w-full">
-                    <TabsList className="grid w-full grid-cols-6">
+                    <TabsList className="grid w-full grid-cols-7">
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="ml">ML Lab</TabsTrigger>
                         <TabsTrigger value="simulation">Simulations</TabsTrigger>
                         <TabsTrigger value="api">API Reference</TabsTrigger>
                         <TabsTrigger value="architecture">Architecture</TabsTrigger>
                         <TabsTrigger value="deployment">Deployment</TabsTrigger>
+                        <TabsTrigger value="ai">AI Tutor</TabsTrigger>
                     </TabsList>
 
                     {/* Overview Tab */}
@@ -269,6 +270,127 @@ const PhysicsLabDocs = () => {
                                             <div className="font-medium">Analyze Results</div>
                                             <div className="text-sm text-muted-foreground">View analytics and download results from your dashboard</div>
                                         </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* AI Tutor Tab */}
+                    <TabsContent value="ai" className="space-y-8">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Brain className="h-5 w-5" />
+                                    AI Tutor Integration
+                                </CardTitle>
+                                <CardDescription>
+                                    Details about the Physics AI Tutor endpoints, payloads, example requests, and model capabilities.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <h3 className="text-lg font-semibold">Available Endpoints</h3>
+                                        <ul className="text-sm space-y-2 mt-3">
+                                            <li className="flex items-start gap-3">
+                                                <code className="text-xs">POST /api/physics/ask</code>
+                                                <span className="text-muted-foreground">— Full-featured Q&A (RAG, preferences, image analysis)</span>
+                                            </li>
+                                            <li className="flex items-start gap-3">
+                                                <code className="text-xs">POST /api/physics/quick-ask</code>
+                                                <span className="text-muted-foreground">— Fast, lightweight responses</span>
+                                            </li>
+                                            <li className="flex items-start gap-3">
+                                                <code className="text-xs">POST /api/physics/derivation</code>
+                                                <span className="text-muted-foreground">— Step-by-step derivations</span>
+                                            </li>
+                                            <li className="flex items-start gap-3">
+                                                <code className="text-xs">POST /api/physics/explain</code>
+                                                <span className="text-muted-foreground">— Level-specific explanations</span>
+                                            </li>
+                                            <li className="flex items-start gap-3">
+                                                <code className="text-xs">GET /api/physics/stats</code>
+                                                <span className="text-muted-foreground">— Tutor usage & performance stats</span>
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    <div>
+                                        <h3 className="text-lg font-semibold">Model Capabilities</h3>
+                                        <p className="text-sm text-muted-foreground mt-3">
+                                            The AI Tutor uses Google Gemini models (text + vision) with a supervisor model for quality evaluation and can perform RAG using the Qdrant vector DB when available.
+                                        </p>
+                                        <div className="mt-4 grid grid-cols-1 gap-2 text-sm">
+                                            <div className="flex items-center gap-2"><strong>Primary:</strong> gemini-2.0-flash-exp</div>
+                                            <div className="flex items-center gap-2"><strong>Vision:</strong> gemini-2.0-flash</div>
+                                            <div className="flex items-center gap-2"><strong>Supervisor:</strong> gemini-2.0-pro</div>
+                                            <div className="flex items-center gap-2"><strong>Vector DB:</strong> Qdrant (optional)</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <Separator />
+
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold">Example: Ask (Full)</h3>
+                                    <p className="text-sm text-muted-foreground">This sends user preferences and optional context for RAG.</p>
+                                    <CodeBlock
+                                        id="ai-ask-example"
+                                        language="javascript"
+                                        code={`fetch('/api/physics/ask', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer YOUR_CLERK_TOKEN' },
+  body: JSON.stringify({
+    question: 'Explain conservation of energy',
+    preferences: { difficulty_level: 'intermediate', response_length: 'medium' },
+    include_user_materials: true
+  })
+}).then(r => r.json()).then(console.log);`}
+                                    />
+
+                                    <h4 className="text-sm font-semibold">Typical Response (abridged)</h4>
+                                    <CodeBlock
+                                        id="ai-ask-response"
+                                        language="json"
+                                        code={`{
+  "response": "Conservation of energy states that...",
+  "classification": {"category":"concept","topic":"mechanics","difficulty":"intermediate"},
+  "metadata": {"category":"concept","difficulty_level":"intermediate","response_length":"medium","timestamp":"2025-10-01T12:34:56"}
+}`}
+                                    />
+                                </div>
+
+                                <Separator />
+
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold">Example: Image Analysis</h3>
+                                    <p className="text-sm text-muted-foreground">Send an image description or image path for diagram/graph analysis.</p>
+                                    <CodeBlock
+                                        id="ai-image-example"
+                                        language="javascript"
+                                        code={`fetch('/api/physics/ask', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer YOUR_CLERK_TOKEN' },
+  body: JSON.stringify({
+    question: 'What physics concepts are shown?',
+    context: { image_description: 'A free body diagram showing forces on an inclined plane' }
+  })
+}).then(r => r.json()).then(console.log);`}
+                                    />
+                                </div>
+
+                                <Separator />
+
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold">Quick Links</h3>
+                                    <div className="flex flex-wrap gap-3">
+                                        <Button size="sm" onClick={() => window.location.href = '/ai'}>
+                                            Open AI Chat
+                                        </Button>
+                                        <Button variant="outline" size="sm" onClick={() => window.open('https://github.com/MaximumCell/My-FYP', '_blank')}>
+                                            View Backend Docs
+                                        </Button>
                                     </div>
                                 </div>
                             </CardContent>

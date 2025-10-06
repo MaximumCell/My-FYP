@@ -131,7 +131,7 @@ function AuthenticatedHome() {
               link="/ai"
               linkText="Meet AI Tutor"
               gradient="from-orange-500 to-red-600"
-              comingSoon
+              comingSoon={false}
             />
           </div>
         </div>
