@@ -38,8 +38,14 @@ COPY . /app
 
 ENV PATH="/app:${PATH}"
 
-# Expose the port Render uses via $PORT at runtime; not required in Dockerfile but useful
-EXPOSE 10000
+# Expose a default port (used for local testing). Render will provide $PORT at runtime.
+ENV PORT=10000
+EXPOSE ${PORT}
 
-# Use gunicorn to run the Flask app exposed as backend.app:app
-CMD ["gunicorn", "--bind", "0.0.0.0:$PORT", "backend.app:app", "--workers", "1", "--threads", "2", "--timeout", "120"]
+# Use gunicorn to run the Flask app. Run via shell so environment variable $PORT is expanded by the runtime
+# when Render injects the port. This avoids passing the literal string "$PORT" as a port number.
+CMD sh -c "gunicorn --bind 0.0.0.0:${PORT} backend.app:app --workers 1 --threads 2 --timeout 120"
+
+# A lightweight healthcheck to help local testing (optional)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
