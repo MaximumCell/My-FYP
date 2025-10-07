@@ -5,6 +5,15 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import MatterSimulation from '@/components/MatterSimulation';
 
+// Add all possible simulation types for static export
+export function generateStaticParams() {
+    return [
+        { type: 'pendulum' },
+        { type: 'collision' },
+        { type: 'projectile' },
+    ];
+}
+
 const simulationTypes = {
     'pendulum': 'Pendulum',
     'collision': 'Collision',
