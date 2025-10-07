@@ -12,13 +12,13 @@ export PYTHONPATH="${PYTHONPATH:-/app}"
 export FLASK_APP="${FLASK_APP:-backend.app:app}"
 export FLASK_ENV="${FLASK_ENV:-production}"
 
-# Create necessary directories
-mkdir -p /app/logs
-mkdir -p /app/temp
+# Create necessary directories if they don't exist
+mkdir -p /app/logs 2>/dev/null || true
+mkdir -p /app/temp 2>/dev/null || true
 
-# Set permissions
-chmod -R 755 /app/backend
-chmod -R 755 /app/logs
+# Set permissions (only if we have write access)
+chmod -R 755 /app/backend 2>/dev/null || true
+chmod -R 755 /app/logs 2>/dev/null || true
 
 echo "📁 Directory structure set up"
 

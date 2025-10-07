@@ -59,17 +59,14 @@ WORKDIR /app
 # Copy application code
 COPY --chown=appuser:appuser . /app
 
-# Make start script executable
-RUN chmod +x /app/start.sh
-
-# Ensure backend directory is accessible
-RUN chmod -R 755 /app/backend
+# Make start script executable and create directories as root
+RUN chmod +x /app/start.sh && \
+    chmod -R 755 /app/backend && \
+    mkdir -p /app/logs && \
+    chown -R appuser:appuser /app/logs
 
 # Switch to non-root user
 USER appuser
-
-# Create logs directory
-RUN mkdir -p /app/logs
 
 # Set environment variables
 ENV PORT=10000 \
