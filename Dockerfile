@@ -44,7 +44,7 @@ EXPOSE ${PORT}
 
 # Use gunicorn to run the Flask app. Run via shell so environment variable $PORT is expanded by the runtime
 # when Render injects the port. This avoids passing the literal string "$PORT" as a port number.
-CMD sh -c "gunicorn --bind 0.0.0.0:${PORT} backend.app:app --workers 1 --threads 2 --timeout 120"
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} backend.app:app --workers 1 --threads 2 --timeout 120 --log-level debug --access-logfile - --error-logfile -"]
 
 # A lightweight healthcheck to help local testing (optional)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
