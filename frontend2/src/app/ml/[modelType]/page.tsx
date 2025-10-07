@@ -1,4 +1,7 @@
 
+
+'use client';
+
 // Add all possible model types for static export
 export function generateStaticParams() {
   return [
@@ -6,8 +9,6 @@ export function generateStaticParams() {
     { modelType: 'classification' },
   ];
 }
-
-'use client';
 
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
