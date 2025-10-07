@@ -145,6 +145,30 @@ if books_bp:
 if physics_advanced_bp:
     app.register_blueprint(physics_advanced_bp)  # Phase 7.3 advanced physics routes
 
+# Root endpoint
+@app.route('/', methods=['GET'])
+def root():
+    """Root endpoint with API overview"""
+    return {
+        "service": "PhysicsLab Backend API",
+        "status": "running",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/health",
+            "ml": "/ml",
+            "simulation": "/simulation",
+            "ai": "/ai",
+            "users": "/api/users",
+            "models": "/api/models",
+            "simulations": "/api/simulations",
+            "materials": "/api/materials",
+            "books": "/api/books",
+            "physics": "/api/physics"
+        },
+        "documentation": "Visit /health for service status",
+        "timestamp": datetime.now().isoformat()
+    }, 200
+
 # Health check endpoint
 @app.route('/health', methods=['GET'])
 def health_check():
