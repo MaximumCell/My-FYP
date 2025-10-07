@@ -25,4 +25,7 @@ scikit-learn>=1.2.2
 # Symbolic math used by simulation/plot_2d.py
 sympy>=1.12.0
 # Optional: include TF CPU if you need ML in this service. Comment out to reduce image size and build time.
-tensorflow-cpu==2.13.0
+# Optional: include TF CPU if you need ML in this service. Comment out to reduce image size and build time.
+# TensorFlow conflicts with some pydantic typing-extensions requirements. If you need TF, move it to a separate ML service
+# or pin compatible versions and install separately.
+# tensorflow-cpu==2.13.0
