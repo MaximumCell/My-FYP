@@ -45,18 +45,21 @@ except Exception:
     except Exception:
         physics_chat_session = None
     
-    # Load book_ingest
+    # Load book_ingest (set package to allow relative imports inside ai modules)
     bi_path = base / 'ai' / 'book_ingest.py'
-    spec3 = importlib.util.spec_from_file_location('book_ingest_local', str(bi_path))
+    spec3 = importlib.util.spec_from_file_location('backend.ai.book_ingest', str(bi_path))
     bi_mod = importlib.util.module_from_spec(spec3)
+    # Ensure parent package is set so `from .content_extractor` works inside book_ingest
+    bi_mod.__package__ = 'backend.ai'
     spec3.loader.exec_module(bi_mod)
     book_ingest = bi_mod
     
     # Load embedding_service (optional)
     try:
         es_path = base / 'ai' / 'embedding_service.py'
-        spec4 = importlib.util.spec_from_file_location('embedding_service_local', str(es_path))
+        spec4 = importlib.util.spec_from_file_location('backend.ai.embedding_service', str(es_path))
         es_mod = importlib.util.module_from_spec(spec4)
+        es_mod.__package__ = 'backend.ai'
         spec4.loader.exec_module(es_mod)
         get_embedding_service = getattr(es_mod, 'get_embedding_service')
     except Exception:

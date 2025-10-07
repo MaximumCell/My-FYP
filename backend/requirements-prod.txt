@@ -18,6 +18,7 @@ python-pptx>=0.6.21
 httpx>=0.25.0
 cloudinary
 joblib
+google-generative-ai
 matplotlib
 seaborn
 plotly
