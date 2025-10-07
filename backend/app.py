@@ -1,6 +1,19 @@
 # Main App Entry Point
 import sys
 import os
+import logging
+
+# Configure logging first before any other imports
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('server.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 # Ensure the repository root is on sys.path so imports like `import backend.xxx` work
 # whether the app is run from the repo root or from the backend/ subdirectory.
 repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -13,13 +26,14 @@ if backend_dir not in sys.path:
 
 from flask import Flask
 from flask_cors import CORS
+
 # Import blueprints defensively so missing optional deps don't crash startup
 def _import_blueprint(module_path: str, attr: str):
     try:
         mod = __import__(module_path, fromlist=[attr])
         return getattr(mod, attr)
     except Exception as e:
-        logging.getLogger(__name__).warning(f"Optional blueprint {module_path}.{attr} failed to import: {e}")
+        logger.warning(f"Optional blueprint {module_path}.{attr} failed to import: {e}")
         return None
 
 ml_bp = _import_blueprint('routes.ml_routes', 'ml_bp')
@@ -42,18 +56,6 @@ from utils.performance_optimization import (
 )
 from datetime import datetime
 import atexit
-import logging
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('server.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 

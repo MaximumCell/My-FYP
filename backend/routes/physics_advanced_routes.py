@@ -12,17 +12,27 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Try package imports first
+# Try package imports first with better error handling
 try:
     from backend.ai.enhanced_physics_tutor import EnhancedPhysicsAITutor
-except ImportError:
+    PHYSICS_AI_AVAILABLE = True
+except ImportError as e:
     # Fallback for direct execution
-    import sys
-    import os
-    from pathlib import Path
-    backend_dir = Path(__file__).resolve().parent.parent
-    sys.path.insert(0, str(backend_dir))
-    from ai.enhanced_physics_tutor import EnhancedPhysicsAITutor
+    try:
+        import sys
+        import os
+        from pathlib import Path
+        backend_dir = Path(__file__).resolve().parent.parent
+        sys.path.insert(0, str(backend_dir))
+        from ai.enhanced_physics_tutor import EnhancedPhysicsAITutor
+        PHYSICS_AI_AVAILABLE = True
+    except ImportError as e2:
+        print(f"Warning: Physics AI modules not available: {e}, {e2}")
+        PHYSICS_AI_AVAILABLE = False
+        # Create a dummy class to prevent blueprint registration from failing
+        class EnhancedPhysicsAITutor:
+            def __init__(self, *args, **kwargs):
+                pass
 
 physics_bp = Blueprint('physics_advanced', __name__, url_prefix='/api/physics')
 
@@ -52,9 +62,25 @@ def run_async(coro):
     future = asyncio.run_coroutine_threadsafe(coro, loop)
     return future.result(timeout=120)  # Increased timeout to 120 seconds
 
+def require_physics_ai(f):
+    """Decorator to check if physics AI is available"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not PHYSICS_AI_AVAILABLE:
+            return jsonify({
+                'error': 'Physics AI module is not available. Please check server configuration.',
+                'timestamp': datetime.now().isoformat(),
+                'status': 'service_unavailable'
+            }), 503
+        return f(*args, **kwargs)
+    return decorated_function
+
 def get_tutor():
     """Get or create tutor instance with Qdrant client"""
     global tutor_instance
+    if not PHYSICS_AI_AVAILABLE:
+        return None
+        
     if tutor_instance is None:
         # Import and create Qdrant client
         try:
@@ -84,6 +110,7 @@ def get_tutor():
 
 
 @physics_bp.route('/ask', methods=['POST'])
+@require_physics_ai
 def ask_physics_question():
     """
     Phase 7.3: Ask physics question with advanced features
