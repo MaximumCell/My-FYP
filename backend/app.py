@@ -3,15 +3,24 @@ import sys
 import os
 import logging
 
-# Configure logging first before any other imports
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('server.log'),
-        logging.StreamHandler()
-    ]
-)
+# Set up logging handlers with graceful fallback
+def setup_logging():
+    """Setup logging with graceful fallback if file writing fails"""
+    handlers = [logging.StreamHandler(sys.stdout)]
+    
+    # Try to add file handler, but don't fail if we can't write to file
+    try:
+        handlers.append(logging.FileHandler('/app/logs/server.log'))
+    except (PermissionError, FileNotFoundError) as e:
+        print(f"Warning: Could not create log file: {e}. Using console logging only.")
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=handlers
+    )
+
+setup_logging()
 logger = logging.getLogger(__name__)
 
 # Ensure the repository root is on sys.path so imports like `import backend.xxx` work
