@@ -278,8 +278,9 @@ export default function Plot2DPage() {
             formData.append('grid', data.grid ? 'true' : 'false');
             formData.append('grid_alpha', data.grid_alpha?.toString() || '0.3');
 
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
             try {
-                const response = await fetch('http://localhost:5000/simulation/plot_csv', {
+                const response = await fetch(`${apiUrl}/simulation/plot_csv`, {
                     method: 'POST',
                     body: formData,
                 });

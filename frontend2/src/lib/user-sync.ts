@@ -4,7 +4,7 @@
 
 const API_BASE_URL = process.env.NODE_ENV === 'production'
     ? process.env.NEXT_PUBLIC_API_URL || 'https://your-backend-url.com'
-    : 'http://localhost:5000';
+    : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
 
 export interface UserSyncData {
     clerk_user_id: string;

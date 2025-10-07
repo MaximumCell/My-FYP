@@ -74,7 +74,8 @@ export default function SavedSimulationsPage() {
     const fetchSavedSimulations = async () => {
         try {
             setLoading(true);
-            const response = await fetch('http://localhost:5000/api/simulations', {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+            const response = await fetch(`${apiUrl}/api/simulations`, {
                 headers: {
                     'X-User-ID': '68d6278f394fbc66b21a8403', // Your user ID
                 },
@@ -117,7 +118,8 @@ export default function SavedSimulationsPage() {
         setDeleteModal(prev => ({ ...prev, isDeleting: true }));
 
         try {
-            const response = await fetch(`http://localhost:5000/api/simulations/${deleteModal.simulation.id}`, {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+            const response = await fetch(`${apiUrl}/api/simulations/${deleteModal.simulation.id}`, {
                 method: 'DELETE',
                 headers: {
                     'X-User-ID': '68d6278f394fbc66b21a8403',

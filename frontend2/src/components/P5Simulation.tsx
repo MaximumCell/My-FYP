@@ -115,7 +115,8 @@ export default function P5Simulation({ simulationType, onParameterChange }: P5Si
                 }
 
                 console.log('Fetching p5 config for:', simulationType, 'with params:', mappedParams)
-                const response = await fetch(`http://localhost:5000/simulation/api/simulation/p5`, {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+                const response = await fetch(`${apiUrl}/simulation/api/simulation/p5`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
