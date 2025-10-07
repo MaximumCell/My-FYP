@@ -13,15 +13,24 @@ if backend_dir not in sys.path:
 
 from flask import Flask
 from flask_cors import CORS
-from routes.ml_routes import ml_bp
-from routes.simulation_routes import simulation_bp
-from routes.ai_routes import ai_bp
-from routes.user_routes import user_bp
-from routes.model_management import model_bp
-from routes.simulation_management import simulation_bp as simulation_mgmt_bp
-from routes.materials_routes import materials_bp
-from routes.books_routes import bp as books_bp
-from routes.physics_advanced_routes import physics_bp as physics_advanced_bp
+# Import blueprints defensively so missing optional deps don't crash startup
+def _import_blueprint(module_path: str, attr: str):
+    try:
+        mod = __import__(module_path, fromlist=[attr])
+        return getattr(mod, attr)
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"Optional blueprint {module_path}.{attr} failed to import: {e}")
+        return None
+
+ml_bp = _import_blueprint('routes.ml_routes', 'ml_bp')
+simulation_bp = _import_blueprint('routes.simulation_routes', 'simulation_bp')
+ai_bp = _import_blueprint('routes.ai_routes', 'ai_bp')
+user_bp = _import_blueprint('routes.user_routes', 'user_bp')
+model_bp = _import_blueprint('routes.model_management', 'model_bp')
+simulation_mgmt_bp = _import_blueprint('routes.simulation_management', 'simulation_bp')
+materials_bp = _import_blueprint('routes.materials_routes', 'materials_bp')
+books_bp = _import_blueprint('routes.books_routes', 'bp')
+physics_advanced_bp = _import_blueprint('routes.physics_advanced_routes', 'physics_bp')
 from utils.database import init_database, close_database, get_database
 from utils.error_middleware import setup_error_handlers, get_error_stats
 from utils.retry_mechanisms import with_database_retry
@@ -97,16 +106,33 @@ def cleanup():
 
 atexit.register(cleanup)
 
-# Register blueprints
-app.register_blueprint(ml_bp, url_prefix='/ml')
-app.register_blueprint(simulation_bp, url_prefix='/simulation')  # Restore prefix for existing routes
-app.register_blueprint(ai_bp, url_prefix='/ai')
-app.register_blueprint(user_bp, url_prefix='/api/users')  # New user routes
-app.register_blueprint(model_bp)  # Model management routes (already includes /api/models prefix)
-app.register_blueprint(simulation_mgmt_bp)  # Simulation management routes (already includes /api/simulations prefix)
-app.register_blueprint(materials_bp)
-app.register_blueprint(books_bp)  # Physics books routes (includes /api/books prefix)
-app.register_blueprint(physics_advanced_bp)  # Phase 7.3 advanced physics routes
+# Register blueprints (only those imported successfully)
+if ml_bp:
+    app.register_blueprint(ml_bp, url_prefix='/ml')
+
+if simulation_bp:
+    app.register_blueprint(simulation_bp, url_prefix='/simulation')  # Restore prefix for existing routes
+
+if ai_bp:
+    app.register_blueprint(ai_bp, url_prefix='/ai')
+
+if user_bp:
+    app.register_blueprint(user_bp, url_prefix='/api/users')  # New user routes
+
+if model_bp:
+    app.register_blueprint(model_bp)  # Model management routes (already includes /api/models prefix)
+
+if simulation_mgmt_bp:
+    app.register_blueprint(simulation_mgmt_bp)  # Simulation management routes (already includes /api/simulations prefix)
+
+if materials_bp:
+    app.register_blueprint(materials_bp)
+
+if books_bp:
+    app.register_blueprint(books_bp)  # Physics books routes (includes /api/books prefix)
+
+if physics_advanced_bp:
+    app.register_blueprint(physics_advanced_bp)  # Phase 7.3 advanced physics routes
 
 # Health check endpoint
 @app.route('/health', methods=['GET'])
