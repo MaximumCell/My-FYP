@@ -1,4 +1,12 @@
 
+// Add all possible model types for static export
+export function generateStaticParams() {
+  return [
+    { modelType: 'regression' },
+    { modelType: 'classification' },
+  ];
+}
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
