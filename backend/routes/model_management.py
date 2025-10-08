@@ -11,6 +11,7 @@ import logging
 # Import our models and utilities
 from models.ml_model import MLModelService, MLModelCreate, MLModelUpdate, ModelType, DatasetInfo, PerformanceMetrics
 from models.user import UserService
+from utils.auth import resolve_user_id_from_headers
 from utils.cloudinary_upload import CloudinaryUploadManager, CloudinaryUploadError
 from utils.error_handler import CloudinaryErrorHandler, ErrorCode
 from utils.database import get_database
@@ -30,25 +31,8 @@ user_service = UserService(db)
 upload_manager = CloudinaryUploadManager()
 
 def get_current_user_id():
-    """
-    Extract user ID from request headers and get the corresponding MongoDB user ID
-    In production, this would integrate with Clerk authentication
-    """
-    # Get Clerk user ID from header
-    clerk_user_id = request.headers.get('X-Clerk-User-ID')
-    if not clerk_user_id:
-        # Fallback to direct MongoDB user ID for testing
-        user_id = request.headers.get('X-User-ID')
-        if not user_id:
-            raise ValueError("User authentication required")
-        return user_id
-    
-    # Find the user in database by Clerk ID
-    user = user_service.get_user_by_clerk_id(clerk_user_id)
-    if not user:
-        raise ValueError("User not found")
-    
-    return str(user.id)
+    # Use resolver helper to support both X-Clerk-User-ID and X-User-ID headers
+    return resolve_user_id_from_headers(request, user_service)
 
 def validate_model_file(file):
     """Validate uploaded model file"""

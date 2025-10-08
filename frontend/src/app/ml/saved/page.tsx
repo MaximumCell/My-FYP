@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +46,7 @@ interface SavedModelsResponse {
 
 export default function SavedModelsPage() {
     const [models, setModels] = useState<SavedModel[]>([]);
+    const { userId, isLoaded } = useAuth();
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [deleteModal, setDeleteModal] = useState<{
@@ -56,16 +58,18 @@ export default function SavedModelsPage() {
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     useEffect(() => {
+        if (!isLoaded) return;
         fetchSavedModels();
-    }, []);
+    }, [isLoaded, userId]);
 
     const fetchSavedModels = async () => {
         try {
             setLoading(true);
+            const headers: Record<string, string> = {};
+            if (userId) headers['X-User-ID'] = userId;
+
             const response = await fetch(`${apiUrl}/api/models`, {
-                headers: {
-                    'X-User-ID': '68d6278f394fbc66b21a8403', // Your user ID
-                },
+                headers,
             });
 
             const result: SavedModelsResponse = await response.json();
@@ -86,10 +90,11 @@ export default function SavedModelsPage() {
 
     const handleDownload = async (model: SavedModel) => {
         try {
+            const headers: Record<string, string> = {};
+            if (userId) headers['X-User-ID'] = userId;
+
             const response = await fetch(`${apiUrl}/api/models/${model.id}/download`, {
-                headers: {
-                    'X-User-ID': '68d6278f394fbc66b21a8403',
-                },
+                headers,
             });
 
             if (!response.ok) {
@@ -127,11 +132,12 @@ export default function SavedModelsPage() {
         setDeleteModal(prev => ({ ...prev, isDeleting: true }));
 
         try {
+            const headers: Record<string, string> = {};
+            if (userId) headers['X-User-ID'] = userId;
+
             const response = await fetch(`${apiUrl}/api/models/${deleteModal.model.id}`, {
                 method: 'DELETE',
-                headers: {
-                    'X-User-ID': '68d6278f394fbc66b21a8403',
-                },
+                headers,
             });
 
             const result = await response.json();

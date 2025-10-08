@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Loader2, X, Maximize2, Download, ExternalLink } from 'lucide-react';
@@ -55,13 +56,13 @@ export default function HtmlPlotViewer({
 
         try {
             // First, get the view URL from the backend
+            const { userId } = useAuth();
+            const headers: Record<string, string> = {};
+            if (userId) headers['X-User-ID'] = userId;
+
             const response = await fetch(
                 `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/simulations/${simulationId}/view?mode=url`,
-                {
-                    headers: {
-                        'X-User-ID': '68d6278f394fbc66b21a8403',
-                    },
-                }
+                { headers }
             );
 
             const result: ViewResponse = await response.json();

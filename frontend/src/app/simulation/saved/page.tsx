@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useAuth } from '@clerk/nextjs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +54,7 @@ interface SavedSimulationsResponse {
 }
 
 export default function SavedSimulationsPage() {
+    const { userId, isLoaded } = useAuth();
     const [simulations, setSimulations] = useState<SavedSimulation[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -68,17 +70,20 @@ export default function SavedSimulationsPage() {
     const { toast } = useToast();
 
     useEffect(() => {
+        // Wait for Clerk auth to load and provide a userId before fetching
+        if (!isLoaded) return;
         fetchSavedSimulations();
-    }, []);
+    }, [isLoaded, userId]);
 
     const fetchSavedSimulations = async () => {
         try {
             setLoading(true);
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+            const headers: Record<string, string> = {};
+            if (userId) headers['X-User-ID'] = userId;
+
             const response = await fetch(`${apiUrl}/api/simulations`, {
-                headers: {
-                    'X-User-ID': '68d6278f394fbc66b21a8403', // Your user ID
-                },
+                headers,
             });
 
             const result: SavedSimulationsResponse = await response.json();
@@ -119,11 +124,12 @@ export default function SavedSimulationsPage() {
 
         try {
             const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+            const headers: Record<string, string> = {};
+            if (userId) headers['X-User-ID'] = userId;
+
             const response = await fetch(`${apiUrl}/api/simulations/${deleteModal.simulation.id}`, {
                 method: 'DELETE',
-                headers: {
-                    'X-User-ID': '68d6278f394fbc66b21a8403',
-                },
+                headers,
             });
 
             const result = await response.json();

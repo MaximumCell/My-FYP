@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@clerk/nextjs';
 
 interface SaveSimulationData {
     simulation_name: string;
@@ -35,6 +36,7 @@ export const useSaveSimulation = (): UseSaveSimulationReturn => {
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
+    const { userId, isLoaded } = useAuth();
 
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const saveSimulation = async (data: SaveSimulationData) => {
@@ -46,7 +48,8 @@ export const useSaveSimulation = (): UseSaveSimulationReturn => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-User-ID': '68d6278f394fbc66b21a8403', // Your user ID - in production this would come from auth
+                    // Include X-User-ID when available from Clerk
+                    ...(userId ? { 'X-User-ID': userId } : {}),
                 },
                 body: JSON.stringify(data),
             });

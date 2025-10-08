@@ -117,7 +117,10 @@ export async function saveTrainedModel(
 
         // For now, we'll use a test user ID header until Clerk integration is complete
         // This should be replaced with proper Clerk user ID extraction
-        headers['X-User-ID'] = '68d6278f394fbc66b21a8403'; // Your actual user ID
+        // If running in a component that has access to Clerk, prefer passing userId in
+        // through a caller or include it here if available in context. We'll keep a
+        // graceful fallback of not including the header when userId isn't available.
+        // Note: this file is a library; prefer callers to pass auth headers.
 
         console.log('Uploading model to new API...');
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
