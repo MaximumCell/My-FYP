@@ -5,7 +5,7 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,7 @@ import {
 import { usePhysicsChat, ChatMessage } from '@/hooks/use-physics-chat';
 import { LatexRenderer } from '@/components/latex-renderer';
 import { cn } from '@/lib/utils';
+import { useRef as reactUseRef } from 'react';
 
 export function PhysicsAIChat() {
   const {
@@ -475,3 +476,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     </div>
   );
 }
+function useRef<T>(initialValue: T | null) {
+  return reactUseRef<T>(initialValue);
+}
+

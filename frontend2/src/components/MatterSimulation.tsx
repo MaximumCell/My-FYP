@@ -491,7 +491,7 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
         setIsPaused(false)
 
         // Force re-render by updating a key state
-        setConfig(prevConfig => ({
+        setConfig((prevConfig: typeof config) => ({
             ...prevConfig!,
             // Add a timestamp to force re-render
             resetTimestamp: Date.now()
