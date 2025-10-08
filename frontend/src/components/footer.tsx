@@ -1,7 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { Logo } from './icons';
-import { Twitter, Facebook, Linkedin, Github } from 'lucide-react';
+import { Instagram, Facebook, Linkedin, Github } from 'lucide-react';
 
 export default function Footer() {
   return (
@@ -46,15 +46,15 @@ export default function Footer() {
             <h3 className="text-xl font-bold text-foreground">Follow Us</h3>
             <div className="flex space-x-4">
               <a
-                href="https://twitter.com"
+                href="https://www.instagram.com/maximum_cell/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-primary transition-colors"
               >
-                <Twitter className="h-6 w-6" />
+                <Instagram className="h-6 w-6" />
               </a>
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/profile.php?id=100040370710046"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-primary transition-colors"
@@ -62,7 +62,7 @@ export default function Footer() {
                 <Facebook className="h-6 w-6" />
               </a>
               <a
-                href="https://linkedin.com"
+                href="https://www.linkedin.com/in/ali-hassan-36a43b318/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-primary transition-colors"
@@ -70,7 +70,7 @@ export default function Footer() {
                 <Linkedin className="h-6 w-6" />
               </a>
               <a
-                href="https://github.com"
+                href="https://github.com/MaximumCell"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:text-primary transition-colors"
@@ -84,7 +84,7 @@ export default function Footer() {
           <div className="space-y-4">
             <h3 className="text-xl font-bold text-foreground">Contact Us</h3>
             <ul className="space-y-2">
-              <li>Email: support@physicslab.com</li>
+              <li>Email: <a href="mailto:alihassanwinner@gmail.com" className="hover:text-primary">alihassanwinner@gmail.com</a></li>
               <li>Phone: +1 (123) 456-7890</li>
             </ul>
           </div>

@@ -45,18 +45,34 @@ export default function Header() {
             <span className="hidden font-bold sm:inline-block">PhysicsLab</span>
           </Link>
           <nav className="flex items-center space-x-6 text-sm font-medium">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={cn(
-                  'transition-colors hover:text-foreground/80',
-                  pathname === link.href ? 'text-foreground' : 'text-foreground/60'
-                )}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {/* Public links */}
+            <Link href="/docs" className={cn('transition-colors hover:text-foreground/80', pathname === '/docs' ? 'text-foreground' : 'text-foreground/60')}>
+              Docs
+            </Link>
+
+            {/* Auth-only links */}
+            <SignedIn>
+              {navLinks.filter(l => l.href !== '/docs').map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    'transition-colors hover:text-foreground/80',
+                    pathname === link.href ? 'text-foreground' : 'text-foreground/60'
+                  )}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </SignedIn>
+            <SignedOut>
+              {/* Show static labels for unauthenticated users (not clickable) */}
+              {navLinks.filter(l => l.href !== '/docs').map((link) => (
+                <span key={link.href} className="text-foreground/40 cursor-not-allowed">
+                  {link.label}
+                </span>
+              ))}
+            </SignedOut>
           </nav>
         </div>
 

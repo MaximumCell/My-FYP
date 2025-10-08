@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Rocket, BrainCircuit, TestTube, Users, Shield, Zap } from 'lucide-react';
 import Image from 'next/image';
-import { SignUpButton } from '@clerk/nextjs';
+import { SignUpButton, SignedIn, SignedOut } from '@clerk/nextjs';
 
 export default function WelcomePage() {
     return (
@@ -29,12 +29,22 @@ export default function WelcomePage() {
                                 </p>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-4">
-                                <SignUpButton>
-                                    <Button size="lg" className="text-lg px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300">
-                                        <Users className="mr-2 h-5 w-5" />
-                                        Get Started Free
+                                <SignedOut>
+                                    <SignUpButton>
+                                        <Button size="lg" className="text-lg px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300">
+                                            <Users className="mr-2 h-5 w-5" />
+                                            Get Started Free
+                                        </Button>
+                                    </SignUpButton>
+                                </SignedOut>
+                                <SignedIn>
+                                    <Button size="lg" className="text-lg px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300" asChild>
+                                        <a href="/ml">
+                                            <Users className="mr-2 h-5 w-5" />
+                                            Get Started Free
+                                        </a>
                                     </Button>
-                                </SignUpButton>
+                                </SignedIn>
                                 <Button variant="outline" size="lg" asChild className="text-lg px-8 py-4 hover:bg-primary/5 transition-all duration-300">
                                     <Link href="#features">
                                         <TestTube className="mr-2 h-5 w-5" />
@@ -313,16 +323,8 @@ function FeatureCard({
                             ))}
                         </div>
                         <div className="pt-4">
-                            {actionHref ? (
-                                <Link href={actionHref} className="w-full md:w-auto">
-                                    <Button
-                                        size="lg"
-                                        className="w-full md:w-auto shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
-                                    >
-                                        {actionLabel ?? 'Open'}
-                                    </Button>
-                                </Link>
-                            ) : (
+                            {/* Show sign-up CTA for unauthenticated users, real links for signed-in users */}
+                            <SignedOut>
                                 <SignUpButton>
                                     <Button
                                         size="lg"
@@ -331,7 +333,27 @@ function FeatureCard({
                                         Get Started &rarr;
                                     </Button>
                                 </SignUpButton>
-                            )}
+                            </SignedOut>
+
+                            <SignedIn>
+                                {actionHref ? (
+                                    <Link href={actionHref} className="w-full md:w-auto">
+                                        <Button
+                                            size="lg"
+                                            className="w-full md:w-auto shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                                        >
+                                            {actionLabel ?? 'Open'}
+                                        </Button>
+                                    </Link>
+                                ) : (
+                                    <Button
+                                        size="lg"
+                                        className="w-full md:w-auto shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
+                                    >
+                                        Get Started &rarr;
+                                    </Button>
+                                )}
+                            </SignedIn>
                         </div>
                     </div>
                 </div>
