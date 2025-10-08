@@ -36,12 +36,13 @@ export const useSaveSimulation = (): UseSaveSimulationReturn => {
     const [error, setError] = useState<string | null>(null);
     const { toast } = useToast();
 
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     const saveSimulation = async (data: SaveSimulationData) => {
         setIsSaving(true);
         setError(null);
 
         try {
-            const response = await fetch('http://localhost:5000/api/simulations/save', {
+            const response = await fetch(`${apiUrl}/api/simulations/save`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

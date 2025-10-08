@@ -120,7 +120,8 @@ export async function saveTrainedModel(
         headers['X-User-ID'] = '68d6278f394fbc66b21a8403'; // Your actual user ID
 
         console.log('Uploading model to new API...');
-        const uploadResponse = await fetch('http://localhost:5000/api/models/upload', {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+        const uploadResponse = await fetch(`${apiUrl}/api/models/upload`, {
             method: 'POST',
             headers,
             body: formData,

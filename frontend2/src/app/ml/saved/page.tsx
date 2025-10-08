@@ -54,6 +54,7 @@ export default function SavedModelsPage() {
     }>({ isOpen: false, model: null, isDeleting: false });
     const { toast } = useToast();
 
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
     useEffect(() => {
         fetchSavedModels();
     }, []);
@@ -61,7 +62,7 @@ export default function SavedModelsPage() {
     const fetchSavedModels = async () => {
         try {
             setLoading(true);
-            const response = await fetch('http://localhost:5000/api/models', {
+            const response = await fetch(`${apiUrl}/api/models`, {
                 headers: {
                     'X-User-ID': '68d6278f394fbc66b21a8403', // Your user ID
                 },
@@ -85,7 +86,7 @@ export default function SavedModelsPage() {
 
     const handleDownload = async (model: SavedModel) => {
         try {
-            const response = await fetch(`http://localhost:5000/api/models/${model.id}/download`, {
+            const response = await fetch(`${apiUrl}/api/models/${model.id}/download`, {
                 headers: {
                     'X-User-ID': '68d6278f394fbc66b21a8403',
                 },
@@ -126,7 +127,7 @@ export default function SavedModelsPage() {
         setDeleteModal(prev => ({ ...prev, isDeleting: true }));
 
         try {
-            const response = await fetch(`http://localhost:5000/api/models/${deleteModal.model.id}`, {
+            const response = await fetch(`${apiUrl}/api/models/${deleteModal.model.id}`, {
                 method: 'DELETE',
                 headers: {
                     'X-User-ID': '68d6278f394fbc66b21a8403',

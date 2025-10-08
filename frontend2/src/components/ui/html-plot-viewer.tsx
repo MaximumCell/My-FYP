@@ -56,7 +56,7 @@ export default function HtmlPlotViewer({
         try {
             // First, get the view URL from the backend
             const response = await fetch(
-                `http://localhost:5000/api/simulations/${simulationId}/view?mode=url`,
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/simulations/${simulationId}/view?mode=url`,
                 {
                     headers: {
                         'X-User-ID': '68d6278f394fbc66b21a8403',

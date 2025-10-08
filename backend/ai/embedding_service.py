@@ -28,7 +28,6 @@ from typing import List, Dict, Any, Optional, Tuple, Union
 from datetime import datetime, timedelta
 import os
 
-import google.generativeai as genai
 import numpy as np
 from dataclasses import dataclass
 from functools import wraps
@@ -209,16 +208,21 @@ class PhysicsEmbeddingService:
             'last_reset': datetime.now()
         }
         
-        # Configure Google Generative AI
+        # Configure Google Generative AI lazily
+        self.genai = None
         if not self.api_key:
             raise ValueError("Google API key not provided. Set GEMINI_API_KEY environment variable.")
-            
+
         try:
+            # Lazy import to avoid requiring the package at module import time
+            import google.generativeai as genai
             genai.configure(api_key=self.api_key)
+            self.genai = genai
             logger.info(f"✅ Embedding service initialized with model: {self.model_name}")
         except Exception as e:
             logger.error(f"❌ Failed to initialize Google Generative AI: {e}")
-            raise
+            # Keep service available but mark genai as None. Calls will raise if used.
+            self.genai = None
     
     def preprocess_physics_text(self, text: str) -> str:
         """
@@ -295,7 +299,10 @@ class PhysicsEmbeddingService:
                 await asyncio.sleep(self.rate_limit_delay)
                 
                 # Create embedding request
-                response = genai.embed_content(
+                if not self.genai:
+                    raise RuntimeError("Google Generative AI client not available. Ensure google-generative-ai is installed and GEMINI_API_KEY is set.")
+
+                response = self.genai.embed_content(
                     model=f"models/{self.model_name}",
                     content=processed_text,
                     task_type="RETRIEVAL_DOCUMENT"

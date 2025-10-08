@@ -72,7 +72,8 @@ export default function MatterSimulation({ simulationType, onParameterChange }: 
                 }
 
                 console.log('Fetching config for:', simulationType, 'with params:', mappedParams) // Debug log
-                const response = await fetch(`http://localhost:5000/simulation/api/simulation/matter`, {
+                const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+                const response = await fetch(`${apiUrl}/simulation/api/simulation/matter`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

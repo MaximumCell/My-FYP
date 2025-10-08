@@ -1,0 +1,49 @@
+flask
+flask-cors
+requests>=2.28.0
+gunicorn>=20.1.0
+pymongo>=4.0.0
+python-dotenv
+# Use Pydantic v2 to match code that imports BeforeValidator and other v2 APIs
+pydantic>=2.1.0,<3.0.0
+numpy
+scipy
+pillow>=10.0.0
+opencv-python>=4.8.0
+pdf2image>=1.16.0
+pytesseract>=0.3.10
+python-multipart>=0.0.6
+python-docx>=0.8.11
+python-pptx>=0.6.21
+httpx>=0.25.0
+cloudinary
+joblib
+matplotlib
+seaborn
+plotly
+scikit-learn>=1.2.2
+# Symbolic math used by simulation/plot_2d.py
+sympy>=1.12.0
+
+# Phase 7: Physics AI Tutor Dependencies - Essential for production
+langchain>=0.2.0
+langchain-google-genai>=1.0.0
+langchain-core>=0.2.0
+langchain-community>=0.2.0
+google-generativeai>=0.3.0
+google-genai>=0.3.0
+
+# Vector Database Dependencies
+qdrant-client>=1.6.0
+
+# LaTeX and Visual Generation
+pylatex>=1.4.1
+
+# Additional async dependencies
+aiofiles>=23.0.0
+motor>=3.3.0
+
+# Optional: include TF CPU if you need ML in this service. Comment out to reduce image size and build time.
+# TensorFlow conflicts with some pydantic typing-extensions requirements. If you need TF, move it to a separate ML service
+# or pin compatible versions and install separately.
+# tensorflow-cpu==2.13.0

@@ -2,16 +2,13 @@
 
 import os
 
-try:
-    from tensorflow import keras
-    import numpy as np
-    import pandas as pd
-    import joblib
-except Exception:
-    keras = None
-    np = None
-    pd = None
-    joblib = None
+from utils.lazy_tf import tf, is_available as tf_is_available
+import numpy as np
+import pandas as pd
+import joblib
+
+HAS_DEPS = tf_is_available()
+keras = tf.keras if HAS_DEPS else None
 
 
 def load_and_predict(model_path, input_dict):

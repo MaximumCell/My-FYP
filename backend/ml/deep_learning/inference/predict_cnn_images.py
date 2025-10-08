@@ -11,9 +11,9 @@ import logging
 
 try:
     import numpy as np
-    import tensorflow as tf
     from PIL import Image
-    HAS_DEPS = True
+    from utils.lazy_tf import tf, is_available as tf_is_available
+    HAS_DEPS = tf_is_available()
 except ImportError:
     HAS_DEPS = False
     tf = None
@@ -173,6 +173,7 @@ def load_cnn_image_model(model_name: str) -> tuple:
     Returns:
         Tuple of (model, metadata) or (None, None) if not found
     """
+    # Use proxy `tf` which loads real TF on first access. If not available, return early.
     if not tf:
         return None, None
     

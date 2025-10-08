@@ -28,7 +28,6 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <UserProvider>
           {children}
           <Toaster />
-          <ReactQueryDevtools initialIsOpen={false} />
         </UserProvider>
       </QueryClientProvider>
     </ThemeProvider>

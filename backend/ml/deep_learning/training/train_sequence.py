@@ -2,7 +2,8 @@
 import os
 import time
 try:
-    from tensorflow import keras
+    from utils.lazy_tf import tf, is_available as tf_is_available
+    HAS_DEPS = tf_is_available()
     import numpy as np
     import pandas as pd
 except Exception:
