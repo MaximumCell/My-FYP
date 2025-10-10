@@ -13,8 +13,7 @@
 
 _Revolutionary physics simulation platform combining cutting-edge machine learning, advanced visualizations, and AI-powered tutoring_
 
-[🚀 Live Demo](https://physicslab-demo.com) • [📚 Documentation](https://docs.physicslab.com) • [🔬 Examples](https://examples.physicslab.com) • [💬 Community](https://discord.gg/physicslab)
-
+[🚀 Live Demo](https://physics-lab-six.vercel.app/) • [📚 Documentation](https://physics-lab-six.vercel.app/docs) 
 </div>
 
 ## ✨ Features & Capabilities
@@ -426,24 +425,13 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 - **Shadcn/ui**: Beautiful and accessible UI components
 - **Three.js**: 3D visualization and electromagnetic simulations
 - **Physics Community**: Inspiration from educational physics resources
-
-## 📞 Support & Community
-
-- 📧 **Email**: support@physicslab.com
-- 💬 **Discord**: [Join our community](https://discord.gg/physicslab)
-- 🐛 **Issues**: [GitHub Issues](https://github.com/yourusername/physicslab/issues)
-- 📖 **Documentation**: [Full docs](https://docs.physicslab.com)
-- 🎥 **Tutorials**: [YouTube channel](https://youtube.com/physicslab)
-
 ---
 
 <div align="center">
 
-**Made with ❤️ by the PhysicsLab Team**
+**Made with ❤️ by the MaximumCell**
 
 _Advancing physics education through technology_
 
-[![Star on GitHub](https://img.shields.io/github/stars/yourusername/physicslab?style=social)](https://github.com/yourusername/physicslab)
-[![Follow on Twitter](https://img.shields.io/twitter/follow/physicslab?style=social)](https://twitter.com/physicslab)
-
+[![Star on GitHub](https://img.shields.io/github/stars/yourusername/physicslab?style=social)](https://github.com/MaximumCell/physicslab)
 </div>
