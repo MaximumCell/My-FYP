@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUser } from '@clerk/nextjs';
 import { Rocket, TestTube, Lightbulb, Download, Loader2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
 
@@ -28,6 +29,7 @@ import EvalSummary from '../components/EvalSummary';
 const validModelTypes: ModelType[] = ['regression', 'classification'];
 
 export default function MlModelTypePage({ params }: { params: Promise<{ modelType: string }> }) {
+  const { user } = useUser();
   // `params` is a Promise in newer Next.js versions — unwrap it using React.use().
   // Use a loose cast to avoid TypeScript complaints if React typings don't include `use`.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -236,7 +238,8 @@ export default function MlModelTypePage({ params }: { params: Promise<{ modelTyp
                     datasetInfo,
                     performanceMetrics,
                     trainingTime: 60.0 // Default training time in seconds (will be replaced with actual timing later)
-                  }
+                  },
+                  user?.id // Pass Clerk user ID for authentication
                 );
 
                 if (saveResult.success) {

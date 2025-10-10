@@ -14,7 +14,6 @@ from utils.lazy_tf import tf, is_available as tf_is_available
 import numpy as np
 
 HAS_DEPS = tf_is_available()
-keras = tf.keras if HAS_DEPS else None
 
 import sys
 import os
@@ -175,7 +174,7 @@ def train_cnn_with_images(zip_file,
         
         # Early stopping
         if epochs > 5:
-            early_stopping = keras.callbacks.EarlyStopping(
+            early_stopping = tf.keras.callbacks.EarlyStopping(
                 monitor='val_loss' if val_dataset else 'loss',
                 patience=max(3, epochs // 10),
                 restore_best_weights=True
@@ -183,7 +182,7 @@ def train_cnn_with_images(zip_file,
             callbacks.append(early_stopping)
         
         # Reduce learning rate on plateau
-        reduce_lr = keras.callbacks.ReduceLROnPlateau(
+        reduce_lr = tf.keras.callbacks.ReduceLROnPlateau(
             monitor='val_loss' if val_dataset else 'loss',
             factor=0.2,
             patience=max(2, epochs // 15),

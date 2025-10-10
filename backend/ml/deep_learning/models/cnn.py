@@ -6,11 +6,11 @@ try:
     from utils.lazy_tf import tf, is_available as tf_is_available
     HAS_DEPS = tf_is_available()
 except Exception:
-    keras = None
+    HAS_DEPS = False
 
 
 def get_model(input_shape, num_classes=1, config=None):
-    if keras is None:
+    if not HAS_DEPS:
         raise RuntimeError("TensorFlow not installed")
     cfg = config or {}
     filters = cfg.get('filters', [32, 64])
@@ -22,16 +22,16 @@ def get_model(input_shape, num_classes=1, config=None):
     loss = cfg.get('loss', 'sparse_categorical_crossentropy' if num_classes>1 else 'binary_crossentropy')
     metrics = cfg.get('metrics', ['accuracy'])
 
-    inputs = keras.layers.Input(shape=input_shape)
+    inputs = tf.keras.layers.Input(shape=input_shape)
     x = inputs
     for f in filters:
-        x = keras.layers.Conv2D(f, kernel_size, activation='relu', padding='same')(x)
-        x = keras.layers.MaxPooling2D(pool_size)(x)
-    x = keras.layers.Flatten()(x)
+        x = tf.keras.layers.Conv2D(f, kernel_size, activation='relu', padding='same')(x)
+        x = tf.keras.layers.MaxPooling2D(pool_size)(x)
+    x = tf.keras.layers.Flatten()(x)
     if dropout and dropout>0:
-        x = keras.layers.Dropout(dropout)(x)
-    outputs = keras.layers.Dense(num_classes if num_classes>1 else 1, activation=final_activation)(x)
+        x = tf.keras.layers.Dropout(dropout)(x)
+    outputs = tf.keras.layers.Dense(num_classes if num_classes>1 else 1, activation=final_activation)(x)
 
-    model = keras.Model(inputs=inputs, outputs=outputs)
+    model = tf.keras.Model(inputs=inputs, outputs=outputs)
     model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
     return model

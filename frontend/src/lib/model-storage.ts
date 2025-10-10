@@ -44,7 +44,7 @@ export interface SaveModelResponse {
 export async function saveTrainedModel(
     modelFilePath: string, // Path to the .pkl file from training
     modelData: SaveModelRequest,
-    userToken?: string // Clerk token for authentication
+    clerkUserId?: string // Clerk user ID for authentication
 ): Promise<SaveModelResponse> {
     try {
         // Step 1: Download the trained model file from the old backend
@@ -110,17 +110,10 @@ export async function saveTrainedModel(
             // Don't set Content-Type for FormData - let the browser set it with boundary
         };
 
-        // Add authentication if available
-        if (userToken) {
-            headers['Authorization'] = `Bearer ${userToken}`;
+        // Add Clerk user ID for authentication
+        if (clerkUserId) {
+            headers['X-Clerk-User-Id'] = clerkUserId;
         }
-
-        // For now, we'll use a test user ID header until Clerk integration is complete
-        // This should be replaced with proper Clerk user ID extraction
-        // If running in a component that has access to Clerk, prefer passing userId in
-        // through a caller or include it here if available in context. We'll keep a
-        // graceful fallback of not including the header when userId isn't available.
-        // Note: this file is a library; prefer callers to pass auth headers.
 
         console.log('Uploading model to new API...');
         const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';

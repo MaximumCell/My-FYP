@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUser } from '@clerk/nextjs';
 import { Rocket, TestTube, Lightbulb, Download, Loader2 } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,6 +29,7 @@ import CNNImageUpload from '@/components/ml/CNNImageUpload';
 import CNNImageTester from '@/components/ml/CNNImageTester';
 
 export default function MlModelTypePage() {
+  const { user } = useUser();
   const [file, setFile] = useState<File | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
   const [targetColumn, setTargetColumn] = useState<string>('');
@@ -246,7 +248,8 @@ export default function MlModelTypePage() {
                 datasetInfo,
                 performanceMetrics,
                 trainingTime: 120.0 // Default training time in seconds for deep learning
-              }
+              },
+              user?.id // Pass Clerk user ID for authentication
             );
 
             if (saveResult.success) {
@@ -606,7 +609,8 @@ export default function MlModelTypePage() {
               datasetInfo,
               performanceMetrics,
               trainingTime: performanceMetrics.training_time
-            }
+            },
+            user?.id // Pass Clerk user ID for authentication
           );
 
           if (saveResult.success) {

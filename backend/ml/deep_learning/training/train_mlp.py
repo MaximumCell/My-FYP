@@ -10,8 +10,8 @@ try:
     HAS_DEPS = tf_is_available()
     import numpy as np
     import pandas as pd
+    keras = tf.keras
 except Exception:
-    keras = None
     np = None
     pd = None
 
