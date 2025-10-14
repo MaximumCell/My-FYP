@@ -61,6 +61,7 @@ flowchart LR
 ```
 
 ## Optional: Dark Theme Variant
+
 If you prefer a dark screenshot, prepend the following directive before the diagram when using mermaid.live:
 
 ```
@@ -70,4 +71,5 @@ If you prefer a dark screenshot, prepend the following directive before the diag
 Then paste the same diagram content below it.
 
 ---
+
 Generated for quick, legible visualization.
