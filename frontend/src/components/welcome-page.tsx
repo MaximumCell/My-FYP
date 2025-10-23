@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Rocket, BrainCircuit, TestTube, Users, Shield, Zap } from 'lucide-react';
 import Image from 'next/image';
-import { SignUpButton, SignedIn, SignedOut } from '@clerk/nextjs';
+import { SignedIn, SignedOut } from '@clerk/nextjs';
 
 export default function WelcomePage() {
     return (
@@ -30,12 +30,12 @@ export default function WelcomePage() {
                             </div>
                             <div className="flex flex-col sm:flex-row gap-4">
                                 <SignedOut>
-                                    <SignUpButton>
+                                    <Link href="/auth/sign-up">
                                         <Button size="lg" className="text-lg px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300">
                                             <Users className="mr-2 h-5 w-5" />
                                             Get Started Free
                                         </Button>
-                                    </SignUpButton>
+                                    </Link>
                                 </SignedOut>
                                 <SignedIn>
                                     <Button size="lg" className="text-lg px-8 py-4 shadow-lg hover:shadow-xl transition-all duration-300" asChild>
@@ -224,12 +224,22 @@ export default function WelcomePage() {
                             Join thousands of students, researchers, and professionals who are already using PhysicsLab to advance their understanding of physics and machine learning.
                         </p>
                         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-                            <SignUpButton>
-                                <Button size="lg" className="text-lg px-10 py-4 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105">
-                                    <Users className="mr-2 h-5 w-5" />
-                                    Create Your Free Account
-                                </Button>
-                            </SignUpButton>
+                            <SignedOut>
+                                <Link href="/auth/sign-up">
+                                    <Button size="lg" className="text-lg px-10 py-4 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105">
+                                        <Users className="mr-2 h-5 w-5" />
+                                        Create Your Free Account
+                                    </Button>
+                                </Link>
+                            </SignedOut>
+                            <SignedIn>
+                                <Link href="/ml">
+                                    <Button size="lg" className="text-lg px-10 py-4 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-105">
+                                        <Users className="mr-2 h-5 w-5" />
+                                        Get Started
+                                    </Button>
+                                </Link>
+                            </SignedIn>
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Shield className="h-4 w-4" />
                                 No credit card required
@@ -325,14 +335,14 @@ function FeatureCard({
                         <div className="pt-4">
                             {/* Show sign-up CTA for unauthenticated users, real links for signed-in users */}
                             <SignedOut>
-                                <SignUpButton>
+                                <Link href="/auth/sign-up">
                                     <Button
                                         size="lg"
                                         className="w-full md:w-auto shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-r from-primary to-accent hover:from-primary/90 hover:to-accent/90"
                                     >
                                         Get Started &rarr;
                                     </Button>
-                                </SignUpButton>
+                                </Link>
                             </SignedOut>
 
                             <SignedIn>

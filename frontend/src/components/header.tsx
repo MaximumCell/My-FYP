@@ -10,8 +10,6 @@ import { Menu } from 'lucide-react';
 import { useState } from 'react';
 import { ThemeToggle } from './theme-toggle';
 import {
-  SignInButton,
-  SignUpButton,
   SignedIn,
   SignedOut,
   UserButton,
@@ -116,16 +114,16 @@ export default function Header() {
         <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
           <div className="flex items-center gap-4">
             <SignedOut>
-              <SignInButton>
+              <Link href="/auth/sign-in">
                 <Button variant="ghost" size="sm">
                   Sign In
                 </Button>
-              </SignInButton>
-              <SignUpButton>
+              </Link>
+              <Link href="/auth/sign-up">
                 <Button size="sm">
                   Sign Up
                 </Button>
-              </SignUpButton>
+              </Link>
             </SignedOut>
             <SignedIn>
               <UserButton
